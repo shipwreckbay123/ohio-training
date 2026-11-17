@@ -5,6 +5,7 @@ import { initializeAuth, indexedDBLocalPersistence, browserLocalPersistence, sig
 import { initializeFirestore, persistentLocalCache, doc, getDoc, setDoc, deleteDoc, onSnapshot, collection } from "firebase/firestore";
 import { LocalNotifications } from "@capacitor/local-notifications";
 import { Capacitor } from "@capacitor/core";
+import { AppLauncher } from "@capacitor/app-launcher";
 import { FIREBASE_CONFIG } from "./config.js";
 
 window.NATIVE = true;
@@ -54,9 +55,9 @@ window.claude = { use: async name => { await loggedIn; return name === "db" ? db
 // ---------- login screen ----------
 const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const css = `
-#login{position:fixed;inset:0;z-index:50;background:var(--bg);overflow:auto;padding:calc(env(safe-area-inset-top) + 40px) 20px 40px}
+#login{position:fixed;inset:0;z-index:50;background:var(--grad);overflow:auto;padding:calc(env(safe-area-inset-top) + 40px) 20px 40px}
 #login .in{max-width:420px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
-#login h1{font-size:44px;font-weight:800}
+#login h1{font-size:44px;font-weight:800;color:var(--accent);text-shadow:var(--glow)}
 #login p{margin:0;color:var(--muted)}
 #login label{display:flex;flex-direction:column;gap:6px;font-weight:600;font-size:15px}
 #login input{border:1.5px solid var(--line);border-radius:12px;background:var(--surface);padding:13px 14px;font-size:17px}
@@ -94,7 +95,7 @@ function showLogin(msg, email) {
 
 // ---------- reminders (Android app only) ----------
 const NKEY = "ohio-notify";
-const NDEF = { session: true, sessionTime: "07:00", test: true, nudge: true, nudgeTime: "20:00" };
+const NDEF = { morning: true, afternoon: true, bedtime: true, prep: true, test: true, nudge: true, nudgeTime: "20:00" };
 function nset() { try { return Object.assign({}, NDEF, JSON.parse(localStorage.getItem(NKEY) || "{}")); } catch (_) { return Object.assign({}, NDEF); } }
 function nsave(s) { try { localStorage.setItem(NKEY, JSON.stringify(s)); } catch (_) {} }
 const isNative = () => Capacitor.isNativePlatform();
@@ -105,23 +106,17 @@ const nid = (dateIso, kind) => Number(dateIso.replace(/-/g, "").slice(2)) * 10 +
 function buildReminders() {
   const O = window.OHIO; if (!O) return [];
   const s = nset(), out = [], now = new Date(), today = O.TODAY;
-  for (let i = 0; i < 21; i++) {
+  const add = (id, when, title, body, d) => { if (when > now) out.push({ id, title, body, schedule: { at: when, allowWhileIdle: true }, extra: { date: d } }); };
+  for (let i = 0; i < 14; i++) {
     const d = O.addDays(today, i), key = O.keyFor(d);
-    if (!O.isTrainKey(key)) continue;
     const ses = O.sessionFor(key, O.phaseFor(d).sp);
     const logged = O.state.logs.some(l => l.id === d + "_" + key);
-    if (s.session) {
-      const when = at(d, s.sessionTime);
-      if (when > now) out.push({ id: nid(d, 1), title: `${ses.dad ? "Dad needed · " : ""}${ses.title} today`, body: `${ses.sub} · ${ses.time} · ${ses.where}`, schedule: { at: when, allowWhileIdle: true }, extra: { date: d } });
-    }
-    if (s.test && key === "test") {
-      const when = at(O.addDays(d, -1), "19:00");
-      if (when > now) out.push({ id: nid(d, 2), title: "Test day tomorrow", body: "Early night. Charge the phone for slow-mo video, bring cones and a tape measure.", schedule: { at: when, allowWhileIdle: true }, extra: { date: d } });
-    }
-    if (s.nudge && !logged) {
-      const when = at(d, s.nudgeTime);
-      if (when > now) out.push({ id: nid(d, 3), title: `Log today’s ${ses.title}?`, body: "Tick what got done, the weights, and how it felt.", schedule: { at: when, allowWhileIdle: true }, extra: { date: d } });
-    }
+    if (s.morning) add(nid(d, 1), at(d, "07:00"), O.isTrainKey(key) ? `${ses.dad ? "Dad needed · " : ""}${ses.title} today` : (O.isSunday(d) ? "Meal prep Sunday" : "Rest day"), O.pick(O.MORNING, d), d);
+    if (s.afternoon) add(nid(d, 2), at(d, "15:00"), "Time to train", O.afternoonLine(d), d);
+    if (s.bedtime) add(nid(d, 3), at(d, "22:30"), "Xbox off", O.pick(O.BEDTIME, d), d);
+    if (s.prep && O.isSunday(d)) add(nid(d, 4), at(d, "10:00"), "Sunday meal prep", "This week: " + O.prepFor(O.addDays(d, 1)).name + ". Shopping list is on the Meals tab.", d);
+    if (s.test && key === "test") add(nid(d, 5), at(O.addDays(d, -1), "19:00"), "Test day tomorrow", "Early night. Charge the phone for slow-mo video, bring cones and a tape measure.", d);
+    if (s.nudge && O.isTrainKey(key) && !logged) add(nid(d, 6), at(d, s.nudgeTime), `Log today’s ${ses.title}?`, "Tick what got done, the weights, and how it felt.", d);
   }
   return out.slice(0, 60);
 }
@@ -163,11 +158,20 @@ window.nativeSettings = () => {
   if (isNative()) {
     h += `<div class="card"><h3 style="font-size:20px">Reminders on this phone</h3>`;
     if (perm === "denied") h += `<div class="alert">Notifications are off for Ohio Training. Turn them on in Settings → Apps → Ohio Training → Notifications.</div>`;
-    h += `${tog("session", "Morning heads-up on training days")}${s.session ? tm("sessionTime", "Time") : ""}
+    h += `${tog("morning", "7am: today’s session + motivation")}
+      ${tog("afternoon", "3pm: time to train")}
+      ${tog("bedtime", "10:30pm: Xbox off")}
+      ${tog("prep", "Sunday 10am: meal prep")}
       ${tog("test", "Test day reminder the night before (7pm)")}
       ${tog("nudge", "Nudge if the session isn’t logged")}${s.nudge ? tm("nudgeTime", "Time") : ""}
-      <div class="muted small">Covers the next 3 weeks and updates every time you open the app. The heads-up says “Dad needed” on home sessions, handy for checking against your roster.</div>
+      <div class="muted small">Covers the next 2 weeks and updates every time you open the app.</div>
       <button class="pill" type="button" data-nact="test">Send a test reminder</button></div>`;
+  } else {
+    h += `<div class="card"><h3 style="font-size:20px">Reminders on your iPhone</h3>
+      <div class="small">iPhone web apps can’t send their own alerts, so the 7am, 3pm and 10:30pm Xbox-off reminders come through your iPhone Calendar instead.</div>
+      <ol class="steps"><li>Open this page in Safari (not from the home-screen icon).</li><li>Tap the button below, then tap <b>Add All</b>.</li><li>Pick a calendar, like “Ohio Training”.</li></ol>
+      <a class="primary" style="display:block;text-align:center;text-decoration:none" href="ohio-reminders.ics">Add reminders to Calendar</a>
+      <div class="muted small">Runs until pre-season. If the program changes, add it again and the reminders update.</div></div>`;
   }
   h += `<div class="card"><h3 style="font-size:20px">Account</h3>
     <div class="small">Logged in as <b>${esc(u ? u.email : "")}</b>. Dad and Ohio each log in with their own email and see the same logs.</div>
@@ -189,6 +193,15 @@ document.addEventListener("click", ev => {
       .then(() => window.OHIO.toast("Test reminder in 3 seconds"));
   }
 });
+
+// ---------- TikTok links open straight in the TikTok app on Android ----------
+window.openTikTok = q => {
+  if (!isNative()) return false;
+  const web = "https://www.tiktok.com/search?q=" + encodeURIComponent(q);
+  const viaWeb = () => AppLauncher.openUrl({ url: web }).catch(() => {});
+  AppLauncher.openUrl({ url: "snssdk1233://search?keyword=" + encodeURIComponent(q) }).then(r => { if (!r || !r.completed) return viaWeb(); }).catch(viaWeb);
+  return true;
+};
 
 // ---------- boot ----------
 let started = false;

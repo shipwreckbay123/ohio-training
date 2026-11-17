@@ -9,7 +9,8 @@
     "@capacitor/android": "8.6.0",
     "@capacitor/core": "8.6.0",
     "@capacitor/local-notifications": "8.3.1",
-    "firebase": "13.3.0"
+    "firebase": "13.3.0",
+    "@capacitor/app-launcher": "8.0.1"
   },
   "devDependencies": {
     "@capacitor/cli": "8.6.0",
