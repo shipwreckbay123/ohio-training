@@ -2,8 +2,8 @@
   "appId": "com.hemi.ohiotraining",
   "appName": "Ohio Training",
   "webDir": "www",
-  "android": { "backgroundColor": "#101316" },
+  "android": { "backgroundColor": "#e9e0ff" },
   "plugins": {
-    "LocalNotifications": { "smallIcon": "ic_stat_ohio", "iconColor": "#F0A400" }
+    "LocalNotifications": { "smallIcon": "ic_stat_ohio", "iconColor": "#6C5CE7" }
   }
 }

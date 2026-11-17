@@ -14,7 +14,7 @@ t = t.replace("<!--__NATIVE__-->", () => `<script>${native}</script>`);
 t = t.replace("</head>", `<link rel="apple-touch-icon" href="icon-180.png">
 <link rel="icon" href="icon-180.png">
 <link rel="manifest" href="manifest.webmanifest">
-<meta name="theme-color" content="#0f0c29">
+<meta name="theme-color" content="#e9e0ff">
 </head>`);
 mkdirSync("www", { recursive: true });
 writeFileSync("www/index.html", t);
@@ -22,7 +22,7 @@ copyFileSync("web/icon-180.png", "www/icon-180.png");
 copyFileSync("web/icon-512.png", "www/icon-512.png");
 writeFileSync("www/manifest.webmanifest", JSON.stringify({
   name: "Ohio Training", short_name: "Ohio", start_url: "./", display: "standalone",
-  background_color: "#0f0c29", theme_color: "#0f0c29",
+  background_color: "#e9e0ff", theme_color: "#e9e0ff",
   icons: [{ src: "icon-180.png", sizes: "180x180", type: "image/png" }, { src: "icon-512.png", sizes: "512x512", type: "image/png" }]
 }));
 
