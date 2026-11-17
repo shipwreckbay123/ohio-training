@@ -169,6 +169,10 @@ label.lbl { font-size: 14px; font-weight: 600; }
 .mtag.home { background: var(--accent); color: var(--accent-ink); border-color: transparent; }
 .mtag.test { background: var(--bad); color: #fff; border-color: transparent; }
 .mtag.ok { background: var(--good); color: #fff; border-color: transparent; }
+.ty { display: inline-block; font-size: 10px; font-weight: 800; letter-spacing: .02em; padding: 1px 4px; border-radius: 5px; color: #fff; line-height: 1.35; }
+.tyrow { display: flex; flex-wrap: wrap; gap: 2px; }
+.daydetail { border-left: 6px solid var(--accent); }
+.mcell.sel { box-shadow: inset 0 0 0 3px var(--ink); }
 .mkey { display: flex; flex-wrap: wrap; gap: 6px 12px; font-size: 13px; color: var(--muted); }
 .mkey .mtag { display: inline-block; margin-right: 4px; }
 
@@ -388,7 +392,7 @@ const BASELINE = { id: 'baseline', date: '2026-11-17', bw: 90, squat: 60, bench:
 
 /* ---------- State + storage ---------- */
 const COLLS = ['logs', 'tests', 'meals', 'weights', 'readiness'];
-const state = { logs: [], tests: [], meals: [], weights: [], readiness: [], view: 'today', date: TODAY, calMode: 'week', weekStart: mondayOf(TODAY), monthStart: TODAY.slice(0, 8) + '01', mealDate: TODAY, drafts: LS.get('ohio_drafts', {}), readOnly: false, testDate: TODAY };
+const state = { logs: [], tests: [], meals: [], weights: [], readiness: [], view: 'today', date: TODAY, calMode: 'month', calSel: TODAY, weekStart: mondayOf(TODAY), monthStart: TODAY.slice(0, 8) + '01', mealDate: TODAY, drafts: LS.get('ohio_drafts', {}), readOnly: false, testDate: TODAY };
 
 const store = {
   db: null, mode: 'loading',
@@ -608,6 +612,7 @@ function renderToday() {
       ${s.dad ? `<span class="chip dad">Dad needed</span>` : ''}
     </div>
     ${ph.note ? `<div class="note">${esc(ph.note)}</div>` : ''}
+    ${(() => { const mt = metaFor(key, ph.sp, d); return `<div class="chips">${mt.t.map(t => `<span class="ty" style="background:${TYPES[t].c};font-size:12px;padding:3px 8px">${esc(TYPES[t].n)}</span>`).join('')}</div><div class="small"><b>Develops:</b> ${esc(mt.dev)}</div><div class="small muted"><b>Recovery:</b> ${esc(mt.r)}</div>`; })()}
   </div>
   ${isTrainKey(key) && key !== 'test' ? readyCard(d) : ''}
   <button class="card" type="button" data-act="goMeals" data-date="${d}" style="text-align:left;cursor:pointer;flex-direction:row;align-items:center;justify-content:space-between">
@@ -729,15 +734,26 @@ function monthHtml() {
       const d = addDays(w, i), k = keyFor(d), out = d.slice(0, 7) !== ms.slice(0, 7);
       const logged = state.logs.some(l => l.id === d + '_' + k);
       if (!out && isTrainKey(k) && d >= START && d <= TODAY) { train++; if (logged) done++; }
-      const s = sessionFor(k, phaseFor(d).sp);
-      const cls = k === 'test' ? 'test' : logged ? 'ok' : s.dad ? 'home' : '';
-      const code = shortCode(k) + (logged ? ' ✓' : '');
-      h += `<button type="button" class="mcell${out ? ' out' : ''}${d === TODAY ? ' today' : ''}${logged ? ' isdone' : ''}" data-act="goDate" data-date="${d}" aria-label="${esc(fmt(d))}: ${esc(s.title)}${logged ? ', done' : ''}">
-        <span class="mnum">${parse(d).getDate()}</span>${code ? `<span class="mtag ${cls}">${esc(code)}</span>` : (isSunday(d) ? '<span class="mtag">Prep</span>' : '')}</button>`;
+      const ph = phaseFor(d), s = sessionFor(k, ph.sp), mt = metaFor(k, ph.sp, d);
+      const chips = mt.t.slice(0, 2).map(t => `<span class="ty" style="background:${TYPES[t].c}">${t}</span>`).join('');
+      h += `<button type="button" class="mcell${out ? ' out' : ''}${d === TODAY ? ' today' : ''}${logged ? ' isdone' : ''}${d === state.calSel ? ' sel' : ''}" data-act="calSel" data-date="${d}" aria-label="${esc(fmt(d))}: ${esc(s.title)}, ${esc(mt.t.map(t => TYPES[t].n).join(', '))}${logged ? ', done' : ''}">
+        <span class="mnum">${parse(d).getDate()}${logged ? ' ✓' : ''}</span><span class="tyrow">${chips}</span></button>`;
     }
     h += '</div>';
   }
-  h += `</div><div class="mkey"><span><span class="mtag">A B C</span>gym days</span><span><span class="mtag home">SpdA</span>speed with Dad</span><span><span class="mtag">Sand</span>school sandhills</span><span><span class="mtag ok">✓</span>logged</span><span><span class="mtag test">Test</span>test day</span><span><span class="mtag">Prep</span>Sunday meal prep</span></div>`;
+  const counts = {};
+  for (let d = ms; d <= mEnd; d = addDays(d, 1)) { if (d < START) continue; metaFor(keyFor(d), phaseFor(d).sp, d).t.forEach(t => { if (t !== 'REC') counts[t] = (counts[t] || 0) + 1; }); }
+  h += `</div><div class="mkey">${Object.keys(TYPES).map(t => `<span><span class="ty" style="background:${TYPES[t].c}">${t}</span> ${esc(TYPES[t].n)}</span>`).join('')}</div>`;
+  const sd = state.calSel, sk = keyFor(sd), sph = phaseFor(sd), ss = sessionFor(sk, sph.sp), sm = metaFor(sk, sph.sp, sd), slog = state.logs.some(l => l.id === sd + '_' + sk);
+  h += `<div class="card daydetail">
+    <div class="kicker" style="font-family:var(--display);text-transform:uppercase;letter-spacing:.1em;color:var(--accent-text)">${esc(fmt(sd, { weekday: 'long', day: 'numeric', month: 'long' }))}${slog ? ' · done ✓' : ''}</div>
+    <h3>${esc(ss.title)}</h3><div class="small">${esc(ss.sub)}${ss.time !== '—' ? ' · ' + esc(ss.time) : ''}</div>
+    <div class="chips">${sm.t.map(t => `<span class="ty" style="background:${TYPES[t].c};font-size:12px;padding:3px 8px">${esc(TYPES[t].n)}</span>`).join('')}</div>
+    <div class="small"><b>Develops:</b> ${esc(sm.dev)}</div>
+    <div class="small"><b>Recovery:</b> ${esc(sm.r)}</div>
+    ${isTrainKey(sk) ? `<button class="pill" type="button" data-act="goDate" data-date="${sd}">Open this session</button>` : ''}
+  </div>`;
+  if (Object.keys(counts).length) h += `<div class="note small"><b>This month:</b> ${Object.entries(counts).map(([t, n]) => `${n} ${TYPES[t].n.toLowerCase()}`).join(' · ')}</div>`;
   if (train) h += `<div class="note num">${done} of ${train} sessions logged so far this month.</div>`;
   return h;
 }
@@ -929,6 +945,16 @@ function renderPlan() {
   <div class="card"><h3>Test days</h3><div class="chips">${TEST_DAYS.map(t => `<span class="chip ${t === nextT ? 'dad' : ''}">${esc(fmt(t))}</span>`).join('')}</div></div>
   <div class="card"><h3>Sound effects</h3><div class="muted small">Plays when he ticks something off. Saving a full session or a PB always plays the big win.</div>
     <div class="chips">${['Big win', 'Coin cascade', 'Jackpot bells', 'Level up', 'Off'].map(n => `<button class="pill" type="button" data-act="sound" data-v="${n}" aria-pressed="${soundPref() === n}" style="${soundPref() === n ? 'background:var(--accent);color:var(--accent-ink);border-color:var(--accent)' : ''}">${n}</button>`).join('')}</div></div>
+  <div class="card"><h3>Recovery guide</h3><ul class="pbs">
+    <li><span><b>Sleep 9 hours</b><br><span class="muted small">The biggest recovery tool. Xbox off 10:30.</span></span><b style="color:var(--good)">Every night</b></li>
+    <li><span><b>Food and protein</b><br><span class="muted small">Muscle can’t grow without it. Shake after training.</span></span><b style="color:var(--good)">Every day</b></li>
+    <li><span><b>Foam rolling</b><br><span class="muted small">Eases soreness. Best as part of the warm-up, 5–10 min.</span></span><b style="color:var(--good)">Most days</b></li>
+    <li><span><b>Sauna</b><br><span class="muted small">10–15 min at UFC Gym, lots of water. Not right before speed work.</span></span><b style="color:var(--good)">2–3× a week</b></li>
+    <li><span><b>Easy swim or walk</b><br><span class="muted small">Gets blood moving on rest days.</span></span><b style="color:var(--good)">Rest days</b></li>
+    <li><span><b>Massage</b><br><span class="muted small">Feels good and eases soreness. Worth it in season or if something is tight.</span></span><b>Monthly, optional</b></li>
+    <li><span><b>Ice bath or cold plunge</b><br><span class="muted small">Slows muscle growth after weights. OK after Thursday sandhills or game days.</span></span><b style="color:var(--bad)">Not on weights days</b></li>
+    <li><span><b>Painkillers for normal soreness</b><br><span class="muted small">Soreness is normal. Only take them if a doctor or physio says to.</span></span><b style="color:var(--bad)">Avoid</b></li>
+  </ul></div>
   <div class="card"><h3>Golden rules</h3><ul class="rules">
     <li>Sprints and jumps are done fresh, first, with full rest. Never as punishment.</li>
     <li>Big lifts are at the gym: bench on Monday, squat and deadlift on Wednesday. He picks the version; the first one is the safest.</li>
@@ -980,6 +1006,7 @@ document.addEventListener('click', async ev => {
   else if (act === 'goToday') { state.date = TODAY; render(); }
   else if (act === 'goDate') { state.date = b.dataset.date; state.weekStart = mondayOf(b.dataset.date); go('today'); }
   else if (act === 'goMeals') { state.mealDate = b.dataset.date; go('meals'); }
+  else if (act === 'calSel') { state.calSel = b.dataset.date; render(); }
   else if (act === 'calMode') { state.calMode = b.dataset.v; render(); }
   else if (act === 'prevWeek') { state.weekStart = addDays(state.weekStart, -7); render(); }
   else if (act === 'nextWeek') { state.weekStart = addDays(state.weekStart, 7); render(); }

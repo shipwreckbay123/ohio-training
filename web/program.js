@@ -263,3 +263,32 @@ function afternoonLine(d) {
   if (/am/.test(s.time)) return 'Morning session done? Big lunch, protein shake, feet up this arvo.';
   return `${s.title} at ${s.time.split('–')[0]}: ${s.sub}. ${s.dad ? 'Dad’s waiting.' : 'Get to the gym.'} Snack first.`;
 }
+
+/* ---------- What each day is, what it builds, and how to recover ---------- */
+const TYPES = {
+  SPR: { n: 'Sprints', c: '#0f9d8a' }, PLY: { n: 'Plyometrics (jumps)', c: '#d6457a' }, WT: { n: 'Weights', c: '#6c5ce7' },
+  PWR: { n: 'Med-ball power', c: '#e07a1f' }, AGI: { n: 'Agility', c: '#c9a000' }, FIT: { n: 'Fitness', c: '#2f7fd8' },
+  REC: { n: 'Recovery', c: '#3aa76d' }, TST: { n: 'Testing', c: '#e0566b' }
+};
+const RECOVER = {
+  weights: 'No ice bath for 6 hours after weights (it slows muscle growth). Shake within 30 min, foam roll anything tight, early night.',
+  speed: 'Foam roll 5–10 min (calves, quads, glutes), stretch, feet up. Big feed.',
+  sand: 'Today’s fine for a cold ocean dip or cold shower, 5–10 min, as there are no weights. Then 10 min mobility.',
+  sunday: 'Sauna 10–15 min at UFC Gym (drink lots of water), 10 min foam roll, early night. Meal prep for the week.',
+  rest: 'Easy walk or swim, stretch, sleep 9 hours.',
+  test: 'Easy evening, big feed, early night.'
+};
+function metaFor(key, sp, d) {
+  const M = {
+    gymA: { t: ['WT', 'PWR'], dev: 'Upper-body strength and pushing power for contact', r: RECOVER.weights },
+    gymB: { t: sp === 3 ? ['WT', 'PLY'] : ['WT'], dev: sp === 3 ? 'Leg strength turned into explosiveness (heavy squat + jumps)' : 'Leg strength and size, hip drive for the first step', r: RECOVER.weights },
+    gymC: { t: ['WT', 'PWR'], dev: 'Upper muscle, neck and grip for contact', r: RECOVER.weights },
+    speedA: { t: ['SPR', 'PLY'], dev: sp >= 2 ? 'Acceleration (first 10–20m), sled power and explosiveness' : 'Acceleration (first 10–20m) and explosiveness', r: RECOVER.speed },
+    speedB: { t: sp === 4 ? ['AGI', 'SPR', 'FIT'] : ['AGI', 'SPR'], dev: sp === 4 ? 'Change of direction, top speed and repeat efforts' : 'Change of direction and top speed', r: RECOVER.speed },
+    sand: { t: ['FIT'], dev: 'Repeat-effort fitness and leg drive (school sandhills)', r: RECOVER.sand },
+    sandHols: { t: ['FIT'], dev: 'Optional fitness top-up', r: RECOVER.sand },
+    test: { t: ['TST'], dev: 'Measuring speed, power and strength progress', r: RECOVER.test },
+    rest: { t: ['REC'], dev: 'Recovery: this is when the muscle gets built', r: d && parse(d).getDay() === 0 ? RECOVER.sunday : RECOVER.rest }
+  };
+  return M[key] || M.rest;
+}
