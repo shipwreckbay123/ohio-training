@@ -62,7 +62,7 @@ h1, h2, h3 { font-family: var(--display); text-transform: uppercase; letter-spac
 /* Generic */
 .card { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 16px; display: flex; flex-direction: column; gap: 10px; }
 .card h3 { font-size: 20px; }
-.card > svg { width: 22px; height: 22px; flex: none; color: var(--accent-text); }
+.card > svg:not(.chart) { width: 22px; height: 22px; flex: none; color: var(--accent-text); }
 .chip { display: inline-flex; align-items: center; gap: 5px; font-size: 13px; padding: 3px 10px; border-radius: 999px; background: var(--soft); border: 1px solid var(--line); color: var(--ink); white-space: nowrap; }
 .chip.dad { background: var(--accent); color: var(--accent-ink); border-color: transparent; font-weight: 600; }
 .chips { display: flex; flex-wrap: wrap; gap: 6px; }
@@ -195,6 +195,26 @@ label.lbl { font-size: 14px; font-weight: 600; }
 .shop li span:last-child { color: var(--muted); white-space: nowrap; }
 ol.steps { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 5px; font-size: 15px; }
 .spark { width: 100%; height: 120px; display: block; }
+.ready .seg5 { display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; }
+.ready .seg5 button { border: 1.5px solid var(--line); background: var(--soft); border-radius: 10px; padding: 6px 2px; font-size: 11.5px; font-weight: 600; line-height: 1.15; min-height: 44px; }
+.ready .seg5 button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.ready .q { font-weight: 700; font-size: 15px; }
+.verdict { border-radius: 12px; padding: 10px 12px; font-size: 15px; border: 1.5px solid; }
+.verdict.go { border-color: var(--good); background: color-mix(in srgb, var(--good) 12%, var(--surface)); }
+.verdict.mid { border-color: #d9a400; background: color-mix(in srgb, #ffcc33 18%, var(--surface)); }
+.verdict.easy { border-color: var(--bad); background: color-mix(in srgb, var(--bad) 12%, var(--surface)); }
+.badges { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.badge { border-radius: 14px; padding: 10px 6px; text-align: center; background: var(--surface); border: 1px solid var(--line); display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.badge .ic { width: 42px; height: 42px; border-radius: 50%; display: grid; place-items: center; background: var(--soft); border: 2px dashed var(--line); font-family: var(--display); font-weight: 800; font-size: 16px; color: var(--muted); }
+.badge.on .ic { background: var(--accent); border: 2px solid var(--accent); color: var(--accent-ink); box-shadow: var(--glow); }
+.badge b { font-size: 13px; line-height: 1.15; }
+.badge span { font-size: 11.5px; color: var(--muted); line-height: 1.2; }
+.badge:not(.on) { opacity: .6; }
+.pbs { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.pbs li { display: flex; justify-content: space-between; gap: 10px; padding: 7px 0; border-top: 1px dashed var(--line); font-size: 15px; }
+.pbs li:first-child { border-top: none; }
+.pbs li b { font-variant-numeric: tabular-nums; }
+.chart { width: 100%; height: 150px; display: block; }
 
 /* Progress */
 .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
@@ -367,8 +387,8 @@ const METRICS = [
 const BASELINE = { id: 'baseline', date: '2026-11-17', bw: 90, squat: 60, bench: 80, dl: 60, chins: 3, label: 'Start' };
 
 /* ---------- State + storage ---------- */
-const COLLS = ['logs', 'tests', 'meals', 'weights'];
-const state = { logs: [], tests: [], meals: [], weights: [], view: 'today', date: TODAY, calMode: 'week', weekStart: mondayOf(TODAY), monthStart: TODAY.slice(0, 8) + '01', mealDate: TODAY, drafts: LS.get('ohio_drafts', {}), readOnly: false, testDate: TODAY };
+const COLLS = ['logs', 'tests', 'meals', 'weights', 'readiness'];
+const state = { logs: [], tests: [], meals: [], weights: [], readiness: [], view: 'today', date: TODAY, calMode: 'week', weekStart: mondayOf(TODAY), monthStart: TODAY.slice(0, 8) + '01', mealDate: TODAY, drafts: LS.get('ohio_drafts', {}), readOnly: false, testDate: TODAY };
 
 const store = {
   db: null, mode: 'loading',
@@ -423,6 +443,107 @@ function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.ad
 function saveDrafts() { LS.set('ohio_drafts', state.drafts); }
 
 /* ---------- Header strip ---------- */
+/* ---------- Readiness check ---------- */
+const READY_Q = [
+  { k: 'sleep', q: 'Sleep last night', opts: ['Under 5h', '5–6h', '7h', '8h', '9h+'] },
+  { k: 'sore', q: 'Legs and body', opts: ['Very sore', 'Sore', 'A bit', 'Fine', 'Fresh'] },
+  { k: 'energy', q: 'Energy', opts: ['Flat', 'Low', 'OK', 'Good', 'Buzzing'] }
+];
+const readyFor = d => state.readiness.find(r => r.id === d) || null;
+function readyVerdict(r) {
+  if (!r || !READY_Q.every(x => r[x.k])) return null;
+  const total = READY_Q.reduce((a, x) => a + Number(r[x.k]), 0), low = READY_Q.some(x => Number(r[x.k]) === 1);
+  if (total <= 7 || low) return { cls: 'easy', total, title: 'Easy day', text: 'Do the warm-up and half the sets at the same weights. Sprints and jumps at 80% effort, no max efforts. If anything hurts, skip it and rest.' };
+  if (total <= 10) return { cls: 'mid', total, title: 'Normal session, listen to the body', text: 'Do the session as planned. If the big lifts feel heavy, drop the last set. Full rest between sprints.' };
+  return { cls: 'go', total, title: 'Good to go', text: 'Fresh and ready. Hit the session hard, with quality reps and full rest.' };
+}
+
+/* ---------- PBs and badges ---------- */
+function bestStreak() {
+  let best = 0, run = 0;
+  for (let d = START; d <= TODAY; d = addDays(d, 1)) {
+    const k = keyFor(d); if (!isTrainKey(k)) continue;
+    if (state.logs.some(l => l.id === d + '_' + k)) { run++; best = Math.max(best, run); } else if (d !== TODAY) run = 0;
+  }
+  return Math.max(best, streak());
+}
+function liftBests() {
+  const out = {};
+  state.logs.forEach(l => Object.entries(l.lifts || {}).forEach(([k, v]) => { const kg = Number(v && v.kg); if (kg > 0 && (!out[k] || kg > out[k].kg)) out[k] = { kg, date: l.date }; }));
+  return out;
+}
+function testBests() {
+  const out = {};
+  METRICS.forEach(m => {
+    let best = null;
+    [BASELINE, ...state.tests].forEach(t => { const v = t[m.k]; if (v === undefined || v === '' || v === null) return; const n = Number(v);
+      if (!best || (m.better === 'up' ? n > best.v : n < best.v)) best = { v: n, date: t.date, base: t.id === 'baseline' }; });
+    if (best) out[m.k] = best;
+  });
+  return out;
+}
+function badgeList() {
+  const sessions = state.logs.length, bs = bestStreak(), lb = liftBests(), tb = testBests();
+  const fullMealDays = state.meals.filter(m => (m.ticks || []).length === MEALS.length).map(m => m.id).sort();
+  let mealRun = 0, bestMealRun = 0, prev = null;
+  fullMealDays.forEach(d => { mealRun = prev && addDays(prev, 1) === d ? mealRun + 1 : 1; bestMealRun = Math.max(bestMealRun, mealRun); prev = d; });
+  const ws = state.weights.slice().sort((a, b) => a.date < b.date ? -1 : 1), gain = ws.length ? Math.max(...ws.map(w => w.kg)) - 90 : 0;
+  const sand = state.logs.filter(l => l.key === 'sand' || l.key === 'sandHols').length;
+  const testPB = METRICS.some(m => tb[m.k] && !tb[m.k].base && state.tests.length);
+  const heavy = Math.max(0, ...Object.values(lb).map(x => x.kg));
+  return [
+    { id: 's1', ic: '1', n: 'First session', how: 'Log a session', on: sessions >= 1 },
+    { id: 'st5', ic: '5', n: '5 in a row', how: '5-session streak', on: bs >= 5 },
+    { id: 'st10', ic: '10', n: '10 in a row', how: '10-session streak', on: bs >= 10 },
+    { id: 'st20', ic: '20', n: 'Machine', how: '20-session streak', on: bs >= 20 },
+    { id: 'n25', ic: '25', n: '25 sessions', how: 'Log 25 sessions', on: sessions >= 25 },
+    { id: 'n50', ic: '50', n: '50 sessions', how: 'Log 50 sessions', on: sessions >= 50 },
+    { id: 'meal1', ic: '7/7', n: 'Clean plate', how: 'Tick every meal in a day', on: fullMealDays.length >= 1 },
+    { id: 'meal7', ic: 'WK', n: 'Fed all week', how: '7 full-meal days in a row', on: bestMealRun >= 7 },
+    { id: 'kg2', ic: '+2', n: '+2kg', how: 'Gain 2kg bodyweight', on: gain >= 2 },
+    { id: 'kg5', ic: '+5', n: '+5kg', how: 'Gain 5kg bodyweight', on: gain >= 5 },
+    { id: 'kg10', ic: '+10', n: '+10kg', how: 'Gain 10kg bodyweight', on: gain >= 10 },
+    { id: 'lift100', ic: '100', n: '100kg club', how: 'Log 100kg on any lift', on: heavy >= 100 },
+    { id: 'lift150', ic: '150', n: '150kg club', how: 'Log 150kg on any lift', on: heavy >= 150 },
+    { id: 'pb', ic: 'PB', n: 'Test PB', how: 'Beat a start-of-program test', on: testPB },
+    { id: 'sand5', ic: 'SND', n: 'Sand man', how: 'Log 5 sandhill sessions', on: sand >= 5 }
+  ];
+}
+let badgesChecked = false;
+function checkNewBadges() {
+  if (store.mode === 'loading') return;
+  const earned = badgeList().filter(b => b.on).map(b => b.id), seen = LS.get('ohio_badges_seen', null);
+  if (seen === null || !badgesChecked && store.mode !== 'synced' && store.mode !== 'local') { if (seen === null) LS.set('ohio_badges_seen', earned); badgesChecked = true; return; }
+  badgesChecked = true;
+  const fresh = earned.filter(id => !seen.includes(id));
+  if (fresh.length) {
+    LS.set('ohio_badges_seen', [...new Set([...seen, ...fresh])]);
+    const names = badgeList().filter(b => fresh.includes(b.id)).map(b => b.n);
+    setTimeout(() => { celebrate(true); toast('Badge unlocked: ' + names.join(', ')); }, 400);
+  }
+}
+
+/* ---------- Line chart for a lift ---------- */
+function liftChart(lift) {
+  const pts = state.logs.filter(l => l.lifts && l.lifts[lift] && Number(l.lifts[lift].kg) > 0).map(l => ({ date: l.date, kg: Number(l.lifts[lift].kg) })).sort((a, b) => a.date < b.date ? -1 : 1);
+  if (!pts.length) return '';
+  const W = 320, H = 150, L = 36, R = 10, T = 14, B = 22;
+  const span = Math.max(1, daysBetween(pts[0].date, pts[pts.length - 1].date));
+  const lo = Math.floor(Math.min(...pts.map(p => p.kg)) / 5) * 5 - 5, hi = Math.ceil(Math.max(...pts.map(p => p.kg)) / 5) * 5 + 5;
+  const X = p => L + (pts.length === 1 ? (W - L - R) / 2 : daysBetween(pts[0].date, p.date) / span * (W - L - R)), Y = v => T + (hi - v) / (hi - lo) * (H - T - B);
+  const best = pts.reduce((a, p) => p.kg > a.kg ? p : a, pts[0]), last = pts[pts.length - 1];
+  const grid = [lo, Math.round((lo + hi) / 2), hi].map(v => `<line x1="${L}" x2="${W - R}" y1="${Y(v)}" y2="${Y(v)}" stroke="currentColor" stroke-opacity=".12"/><text x="${L - 6}" y="${Y(v) + 4}" text-anchor="end" font-size="11" fill="currentColor" opacity=".7">${v}</text>`).join('');
+  const line = pts.map(p => `${X(p).toFixed(1)},${Y(p.kg).toFixed(1)}`).join(' ');
+  const area = `${X(pts[0]).toFixed(1)},${H - B} ${line} ${X(last).toFixed(1)},${H - B}`;
+  return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(LIFTS[lift] ? LIFTS[lift].name : lift)}: from ${pts[0].kg}kg to ${last.kg}kg, best ${best.kg}kg">
+    ${grid}<polygon points="${area}" fill="var(--accent)" fill-opacity=".12"/>
+    <polyline points="${line}" fill="none" stroke="var(--accent)" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>
+    ${pts.map(p => `<circle cx="${X(p).toFixed(1)}" cy="${Y(p.kg).toFixed(1)}" r="${p === last ? 5 : 3}" fill="var(--accent)"/>`).join('')}
+    <text x="${L}" y="${H - 6}" font-size="11" fill="currentColor" opacity=".7">${esc(fmtShort(pts[0].date))}</text>
+    <text x="${W - R}" y="${H - 6}" font-size="11" text-anchor="end" fill="currentColor" opacity=".7">${esc(fmtShort(last.date))}</text>
+    <text x="${Math.min(W - R, X(best) + 8)}" y="${Math.max(T + 10, Y(best.kg) - 8)}" font-size="12" font-weight="700" text-anchor="${X(best) > W - 70 ? 'end' : 'start'}" fill="currentColor">Best ${best.kg}kg</text></svg>`;
+}
+
 function streak() {
   // training days in a row (up to yesterday, plus today if done) where the session was logged
   let n = 0;
@@ -456,6 +577,14 @@ function currentCtx() { const d = state.date, key = keyFor(d), ph = phaseFor(d);
 function touchDraft() { const { id } = currentCtx(); state.drafts[id] = state.drafts[id] || draftFor(id); return state.drafts[id]; }
 function mealsFor(d) { const m = state.meals.find(x => x.id === d); return m ? (m.ticks || []) : []; }
 
+function readyCard(d) {
+  const r = readyFor(d) || {}, v = readyVerdict(r);
+  return `<div class="card ready"><h3>How’s the body?</h3>
+    <div class="muted small">Quick check before training. The app tells you if today should be lighter.</div>
+    ${READY_Q.map(x => `<div class="q">${esc(x.q)}</div><div class="seg5" role="group" aria-label="${esc(x.q)}">${x.opts.map((o, i) => `<button type="button" data-act="ready" data-k="${x.k}" data-v="${i + 1}" aria-pressed="${Number(r[x.k]) === i + 1}">${esc(o)}</button>`).join('')}</div>`).join('')}
+    ${v ? `<div class="verdict ${v.cls}"><b>${esc(v.title)} · ${v.total}/15.</b> ${esc(v.text)}</div>` : ''}
+  </div>`;
+}
 function renderToday() {
   const { d, key, id, ph, s } = currentCtx();
   const log = state.logs.find(l => l.id === id), dr = draftFor(id);
@@ -480,6 +609,7 @@ function renderToday() {
     </div>
     ${ph.note ? `<div class="note">${esc(ph.note)}</div>` : ''}
   </div>
+  ${isTrainKey(key) && key !== 'test' ? readyCard(d) : ''}
   <button class="card" type="button" data-act="goMeals" data-date="${d}" style="text-align:left;cursor:pointer;flex-direction:row;align-items:center;justify-content:space-between">
     <span><b>Meals ${mt} of ${MEALS.length}</b><br><span class="muted small">${isSunday(d) ? 'Sunday meal prep day: ' + esc(prepFor(addDays(d, 1)).name) : 'Tick them off on the Meals tab'}</span></span>${ICON_R}
   </button>`;
@@ -696,6 +826,16 @@ function renderProgress() {
     <button class="primary" type="button" data-act="copySummary">Copy summary for Claude</button>
     <textarea id="summaryBox" readonly hidden aria-label="Summary to copy"></textarea></div>
   <div class="sec-title">Big lifts · latest</div><div class="lifts3">${tiles}</div>
+  ${(() => { const lb = liftBests(), keys = Object.keys(lb).filter(k => LIFTS[k]);
+     return keys.length ? keys.map(k => `<div class="card"><div style="display:flex;justify-content:space-between;align-items:baseline"><h3>${esc(LIFTS[k].name)}</h3><span class="small muted num">Best ${lb[k].kg}kg</span></div>${liftChart(k)}</div>`).join('') : '<div class="empty">Lift charts show up here once he logs a weight on the big lifts.</div>'; })()}
+  <div class="card"><h3>Personal bests</h3><ul class="pbs">${(() => {
+     const lb = liftBests(), tb = testBests(), rows = [];
+     Object.keys(lb).filter(k => LIFTS[k]).forEach(k => rows.push(`<li><span>${esc(LIFTS[k].name)}</span><b>${lb[k].kg}kg <span class="muted small">${esc(fmtShort(lb[k].date))}</span></b></li>`));
+     METRICS.forEach(m => { const t = tb[m.k]; if (t) rows.push(`<li><span>${esc(m.label)}</span><b>${t.v}${m.unit === 'reps' ? ' reps' : m.unit} <span class="muted small">${t.base ? 'start' : esc(fmtShort(t.date))}</span></b></li>`); });
+     rows.push(`<li><span>Longest streak</span><b>${bestStreak()} sessions</b></li>`);
+     return rows.join(''); })()}</ul></div>
+  <div class="sec-title">Badges · ${badgeList().filter(b => b.on).length} of ${badgeList().length}</div>
+  <div class="badges">${badgeList().map(b => `<div class="badge ${b.on ? 'on' : ''}"><div class="ic">${esc(b.ic)}</div><b>${esc(b.n)}</b><span>${esc(b.how)}</span></div>`).join('')}</div>
   <div class="sec-title">Test results</div>
   <div class="tablewrap"><table>
     <thead><tr><th>Test</th>${all.map(t => `<th>${esc(t.label || fmtShort(t.date))}</th>`).join('')}${all.length > 1 ? '<th>Change</th>' : ''}</tr></thead>
@@ -758,6 +898,8 @@ function buildSummary() {
   const mdays = []; for (let d = from; d < TODAY; d = addDays(d, 1)) mdays.push(mealsFor(d).length);
   if (mdays.length) L.push('', `MEALS: average ${(mdays.reduce((a, b) => a + b, 0) / mdays.length).toFixed(1)} of ${MEALS.length} ticked per day over ${mdays.length} days`);
   const ws = state.weights.slice().sort((a, b) => a.date < b.date ? -1 : 1);
+  const rd = state.readiness.filter(r => r.date >= from).sort((a, b) => a.date < b.date ? -1 : 1);
+  if (rd.length) L.push('', 'READINESS (sleep/body/energy out of 5)', rd.map(r => `${fmtShort(r.date)} ${r.sleep || '-'}/${r.sore || '-'}/${r.energy || '-'}`).join(', '));
   L.push('', 'WEIGH-INS', ws.length ? ws.map(w => `${fmtShort(w.date)} ${w.kg}kg`).join(', ') : '- none yet');
   L.push('', 'TESTS');
   [BASELINE, ...state.tests.slice().sort((a, b) => a.date < b.date ? -1 : 1)].forEach(t => {
@@ -820,6 +962,7 @@ function render(fromData) {
   document.querySelectorAll('.tabs a').forEach(t => t.setAttribute('aria-current', t.dataset.tab === state.view ? 'page' : 'false'));
   VIEWS[state.view]();
   $('#bgart').innerHTML = BG_ART[state.view] || '';
+  checkNewBadges();
   if (window.onRendered) window.onRendered();
 }
 function route() { const h = (location.hash || '').replace('#', ''); state.view = VIEWS[h] ? h : 'today'; render(); window.scrollTo(0, 0); }
@@ -866,6 +1009,14 @@ document.addEventListener('click', async ev => {
   else if (act === 'feel') { const dr = touchDraft(); dr.feel = Number(b.dataset.v); saveDrafts(); b.parentElement.querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', String(x === b))); }
   else if (act === 'pain') { const dr = touchDraft(); dr.pain = b.dataset.v === 'yes'; saveDrafts(); b.parentElement.querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', String(x === b))); $('#painAlert').hidden = !dr.pain; }
   else if (act === 'rest') startRest(Number(b.dataset.sec));
+  else if (act === 'ready') {
+    if (state.readOnly) { toast(NO_WRITE); return; }
+    const d = state.date, r = { ...(readyFor(d) || {}), date: d }; delete r.id; r[b.dataset.k] = Number(b.dataset.v);
+    b.parentElement.querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+    await store.put('readiness', d, r);
+    const v = readyVerdict(r); if (v && v.cls === 'go') celebrate(false);
+    render(true);
+  }
   else if (act === 'variant') { LS.set('ohio_var_' + b.dataset.slot, Number(b.dataset.j)); render(); }
   else if (act === 'save') saveSession();
   else if (act === 'saveTest') saveTest();
