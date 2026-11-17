@@ -1,0 +1,15 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Ohio's training logs: Dad and Ohio
+    match /ohio/{document=**} {
+      allow read, write: if request.auth != null
+        && request.auth.token.email in ['hemipure@gmail.com', 'OHIO_EMAIL_HERE'];
+    }
+    // Dinner Planner (unchanged): Dad and Liv
+    match /{document=**} {
+      allow read, write: if request.auth != null
+        && request.auth.token.email in ['hemipure@gmail.com', 'oliviapurcell6@hotmail.com'];
+    }
+  }
+}

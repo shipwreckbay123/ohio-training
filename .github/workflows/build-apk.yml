@@ -1,0 +1,67 @@
+name: Build app
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Build the app page
+        run: |
+          npm ci
+          npm run build
+          npx cap sync android
+
+      - name: Get the iPhone version ready
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: www
+
+      - name: Build the APK
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon
+
+      - name: Name the APK
+        run: cp android/app/build/outputs/apk/debug/app-debug.apk OhioTraining.apk
+
+      - name: Publish it as a release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v1.0.${{ github.run_number }}
+          name: Ohio Training 1.0.${{ github.run_number }}
+          body: Download OhioTraining.apk below on your phone and open it to install or update.
+          files: OhioTraining.apk
+
+  iphone:
+    # Puts the same app online for Ohio's iPhone (GitHub Pages). Needs Settings → Pages → Source: GitHub Actions.
+    needs: build
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - id: deploy
+        uses: actions/deploy-pages@v4
