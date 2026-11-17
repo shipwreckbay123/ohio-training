@@ -333,8 +333,16 @@ function celebrate(big) {
 }
 
 /* ---------- Lift progression ---------- */
-const LIFTS = { squat: { name: 'Squat', start: 45 }, deadlift: { name: 'Deadlift', start: 50 }, bench: { name: 'Bench', start: 62.5 } };
-const incFor = (lift, kg) => lift === 'bench' ? 2.5 : (kg < (lift === 'squat' ? 80 : 100) ? 5 : 2.5);
+const LIFTS = LIFT_INFO;
+const incFor = (lift, kg) => { const i = (LIFTS[lift] || {}).inc || [2.5, 999, 2.5]; return kg < i[1] ? i[0] : i[2]; };
+// Which version of each big lift he's doing (saved on this phone)
+const variantIdx = slot => Math.min(VARIANTS[slot].length - 1, Math.max(0, Number(LS.get('ohio_var_' + slot, 0)) || 0));
+function resolve(e) {
+  if (!e.slot) return e;
+  const v = VARIANTS[e.slot][variantIdx(e.slot)];
+  return { ...e, n: v.n, c: (e.extra || '') + v.c, tt: v.tt, lift: v.lift };
+}
+const itemsOf = s => s.items.map(resolve);
 function lastLift(lift, beforeDate) {
   const rows = state.logs.filter(l => l.lifts && l.lifts[lift] && Number(l.lifts[lift].kg) > 0 && (!beforeDate || l.date < beforeDate)).sort((a, b) => a.date < b.date ? 1 : -1);
   return rows[0] ? { date: rows[0].date, kg: Number(rows[0].lifts[lift].kg), clean: !!rows[0].lifts[lift].clean } : null;
@@ -489,7 +497,7 @@ function renderToday() {
     h += `<details class="block" ${dr.done.length ? '' : 'open'}><summary>${esc(w.title)}</summary><ul class="wu">${w.items.map(([a, b, q]) => `<li><span>${esc(a)}</span><span class="d">${esc(b)}</span>${ttLink(q, true) || '<span></span>'}</li>`).join('')}</ul></details>`;
   }
   h += `<div class="sec-title">Main work · tick each one off</div><ol class="exlist">`;
-  s.items.forEach((e, i) => {
+  itemsOf(s).forEach((e, i) => {
     const done = dr.done.includes(i);
     let liftHtml = '';
     if (e.lift) {
@@ -507,6 +515,7 @@ function renderToday() {
       <button class="tick" type="button" data-act="tick" data-i="${i}" aria-pressed="${done}" aria-label="Mark ${esc(e.n)} done">${ICON_CHECK}</button>
       <div class="ex-body">
         <div class="ex-top"><span class="ex-name">${esc(e.n)}</span><span class="ex-dose">${esc(e.d)}</span></div>
+        ${e.slot ? `<div class="chips" role="group" aria-label="Pick the version">${VARIANTS[e.slot].map((v, j) => `<button class="pill" type="button" data-act="variant" data-slot="${e.slot}" data-j="${j}" aria-pressed="${variantIdx(e.slot) === j}" style="${variantIdx(e.slot) === j ? 'background:var(--accent);color:var(--accent-ink);border-color:var(--accent)' : ''}">${esc(v.short)}${j === 0 ? ' (safest)' : ''}</button>`).join('')}</div>` : ''}
         <p class="cue">${esc(e.c)}</p>
         <div class="ex-actions">${ttLink(e.tt)}${e.r ? `<button class="pill" type="button" data-act="rest" data-sec="${e.r}">${ICON_TIMER} Rest ${mmss(e.r)}</button>` : ''}</div>
         ${liftHtml}
@@ -537,7 +546,7 @@ async function saveSession() {
   const { d, key, id, ph, s } = currentCtx();
   const dr = touchDraft();
   dr.notes = ($('#notes') || {}).value || '';
-  s.items.forEach(e => { if (e.lift) { const kg = parseFloat(($('#kg-' + e.lift) || {}).value); dr.lifts[e.lift] = { kg: isFinite(kg) ? kg : 0, clean: !!($('#clean-' + e.lift) || {}).checked }; } });
+  itemsOf(s).forEach(e => { if (e.lift) { const kg = parseFloat(($('#kg-' + e.lift) || {}).value); dr.lifts[e.lift] = { kg: isFinite(kg) ? kg : 0, clean: !!($('#clean-' + e.lift) || {}).checked }; } });
   const rec = { date: d, key, phase: ph.id, title: s.title, sub: s.sub, total: s.items.length, done: dr.done.slice().sort((a, b) => a - b),
     lifts: dr.lifts, feel: Number(dr.feel) || 0, pain: dr.pain === true ? true : dr.pain === false ? false : null, notes: dr.notes.slice(0, 2000), savedAt: new Date().toISOString() };
   const btn = $('[data-act="save"]'); if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
@@ -677,14 +686,15 @@ function renderProgress() {
   const all = [BASELINE, ...state.tests.slice().sort((a, b) => a.date < b.date ? -1 : 1)];
   const logs = state.logs.slice().sort((a, b) => a.date < b.date ? 1 : a.date > b.date ? -1 : 0);
   const feelWord = ['', 'Wrecked', 'Flat', 'OK', 'Good', 'Flying'];
-  const tiles = Object.keys(LIFTS).map(k => { const l = lastLift(k), sg = suggest(k, addDays(TODAY, 1));
+  const logged = [...new Set(state.logs.flatMap(l => Object.keys(l.lifts || {}).filter(k => l.lifts[k] && l.lifts[k].kg)))];
+  const tiles = (logged.length ? logged : ['squat', 'hinge', 'press'].map(sl => VARIANTS[sl][variantIdx(sl)].lift)).filter(k => LIFTS[k]).map(k => { const l = lastLift(k), sg = suggest(k, addDays(TODAY, 1));
     return `<div class="tile"><span>${esc(LIFTS[k].name)}</span><b>${l ? l.kg : '—'}<small style="font-size:14px"> kg</small></b><span>${l ? 'Next: ' + sg.kg + 'kg' : 'Start ' + LIFTS[k].start + 'kg'}</span></div>`; }).join('');
   let h = `<div class="stack">
   <div class="card"><h3>Get the program adjusted</h3>
     <div class="small muted">Copies the last 4 weeks of sessions, meals, weigh-ins and test results as text. Paste it into the Ohio project in Claude.</div>
     <button class="primary" type="button" data-act="copySummary">Copy summary for Claude</button>
     <textarea id="summaryBox" readonly hidden aria-label="Summary to copy"></textarea></div>
-  <div class="sec-title">Barbell lifts · latest</div><div class="lifts3">${tiles}</div>
+  <div class="sec-title">Big lifts · latest</div><div class="lifts3">${tiles}</div>
   <div class="sec-title">Test results</div>
   <div class="tablewrap"><table>
     <thead><tr><th>Test</th>${all.map(t => `<th>${esc(t.label || fmtShort(t.date))}</th>`).join('')}${all.length > 1 ? '<th>Change</th>' : ''}</tr></thead>
@@ -778,11 +788,12 @@ function renderPlan() {
     <div class="chips">${['Big win', 'Coin cascade', 'Jackpot bells', 'Level up', 'Off'].map(n => `<button class="pill" type="button" data-act="sound" data-v="${n}" aria-pressed="${soundPref() === n}" style="${soundPref() === n ? 'background:var(--accent);color:var(--accent-ink);border-color:var(--accent)' : ''}">${n}</button>`).join('')}</div></div>
   <div class="card"><h3>Golden rules</h3><ul class="rules">
     <li>Sprints and jumps are done fresh, first, with full rest. Never as punishment.</li>
-    <li>Heavy barbell lifts (squat, deadlift, barbell bench) only at home with Dad. Gym days are dumbbells, machines and cables.</li>
+    <li>Big lifts are at the gym: bench on Monday, squat and deadlift on Wednesday. He picks the version; the first one is the safest.</li>
+    <li><b>Lifting alone:</b> barbell squat and bench only inside a rack with the safety arms set, or a mate spotting. Never test a max on his own.</li>
     <li>No sprints the day after a hard leg day.</li>
-    <li>Thursday is school sandhills at Greenhills. That’s his hard fitness for the week, so Wednesday’s bike is easy only.</li>
+    <li>Wednesday is the one big leg day, then Thursday is school sandhills at Greenhills. Legs will feel it; leaving 2 in the tank on Wednesday keeps that manageable.</li>
     <li><b>Leave 2 in the tank:</b> stop the set when he could still do 2 more good reps.</li>
-    <li><b>Adding weight:</b> tick “Every rep clean” and the app adds weight next time (squat and deadlift +5kg while light, then +2.5kg; bench +2.5kg).</li>
+    <li><b>Adding weight:</b> tick “Every rep clean” and the app adds weight next time (machines and barbells +5kg while light, then +2.5kg; bench and dumbbells +2–2.5kg).</li>
     <li>Xbox off at 10:30. Sleep is part of the program.</li>
     <li class="muted">${esc(PAIN_RULE)}</li></ul></div>`;
   if (window.nativeSettings) h += window.nativeSettings();
@@ -854,6 +865,7 @@ document.addEventListener('click', async ev => {
   else if (act === 'feel') { const dr = touchDraft(); dr.feel = Number(b.dataset.v); saveDrafts(); b.parentElement.querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', String(x === b))); }
   else if (act === 'pain') { const dr = touchDraft(); dr.pain = b.dataset.v === 'yes'; saveDrafts(); b.parentElement.querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', String(x === b))); $('#painAlert').hidden = !dr.pain; }
   else if (act === 'rest') startRest(Number(b.dataset.sec));
+  else if (act === 'variant') { LS.set('ohio_var_' + b.dataset.slot, Number(b.dataset.j)); render(); }
   else if (act === 'save') saveSession();
   else if (act === 'saveTest') saveTest();
   else if (act === 'editTest') { state.testDate = b.dataset.date; state.testOpen = true; render(); }

@@ -86,22 +86,48 @@ const TT = {
   fly: 'flying sprint drill', shuttle: '5-10-5 pro agility drill', reactive: 'reactive agility drill rugby', sled: 'sled sprint technique'
 };
 
+/* ---------- Big lifts: done at the gym, he picks the version ----------
+   First option in each list is the default. Safety: barbell work only inside a rack with the safety arms set
+   just below the bottom of the rep, a mate spotting the bench, and never test a max alone. */
+const VARIANTS = {
+  squat: [
+    { lift: 'hacksquat', n: 'Hack squat machine', short: 'Hack squat', c: 'Feet shoulder width, mid-platform. Lower until thighs are parallel, drive up hard. The machine catches the weight, so it’s safe on his own.', tt: 'hack squat machine form' },
+    { lift: 'goblet', n: 'Goblet squat (dumbbell at chest)', short: 'Goblet', c: 'Hold one dumbbell against the chest, elbows inside the knees. Sit down between the heels, chest up. He can just drop the dumbbell if it goes wrong.', tt: 'goblet squat form' },
+    { lift: 'squat', n: 'Back squat · in a rack, safety arms set', short: 'Back squat', c: 'Only inside a squat rack with the safety arms set just below his lowest point. Big breath, tight belly, knees out, drive up fast.', tt: 'how to set safety arms squat rack' }
+  ],
+  hinge: [
+    { lift: 'trapbar', n: 'Trap bar deadlift', short: 'Trap bar', c: 'Stand inside the hex bar, grip the high handles. Hips back, flat back, push the floor away. More upright than a normal deadlift, so it’s easier on the back.', tt: 'trap bar deadlift form' },
+    { lift: 'hipthrust', n: 'Hip thrust (barbell or machine)', short: 'Hip thrust', c: 'Upper back on a bench, pad on the hips. Drive through the heels, squeeze glutes at the top, chin tucked. Builds the hip drive for the first step.', tt: 'barbell hip thrust form' },
+    { lift: 'deadlift', n: 'Deadlift · a mate watching his back', short: 'Deadlift', c: 'Bar over mid-foot, flat back. Push the floor away, stand tall, don’t lean back. Stop the set if his back rounds.', tt: 'deadlift technique beginner' }
+  ],
+  press: [
+    { lift: 'bench', n: 'Barbell bench · safety arms or a mate spotting', short: 'Barbell', c: 'Never alone without the safety arms set just above chest height. Shoulder blades squeezed, feet planted, bar to lower chest, press up and slightly back.', tt: 'bench press safety arms setup' },
+    { lift: 'dbbench', n: 'Dumbbell bench press', short: 'Dumbbells', c: 'Elbows about 45° from the body. Control down, push hard up. If he fails a rep he can just lower the dumbbells to the floor.', tt: 'dumbbell bench press form' }
+  ]
+};
+const LIFT_INFO = {
+  hacksquat: { name: 'Hack squat', start: 40, inc: [5, 120, 2.5] }, goblet: { name: 'Goblet squat', start: 24, inc: [2, 999, 2] }, squat: { name: 'Back squat', start: 45, inc: [5, 80, 2.5] },
+  trapbar: { name: 'Trap bar', start: 60, inc: [5, 120, 2.5] }, hipthrust: { name: 'Hip thrust', start: 60, inc: [5, 120, 2.5] }, deadlift: { name: 'Deadlift', start: 50, inc: [5, 100, 2.5] },
+  bench: { name: 'Bench', start: 62.5, inc: [2.5, 999, 2.5] }, dbbench: { name: 'DB bench (each hand)', start: 26, inc: [2, 999, 2] }
+};
+const BIG = (slot, d, r, extra) => E(slot, d, r, '', { slot, extra: extra || '' });
+
 function sessionFor(key, sp) {
   const P = sp;
   const S = {
-    gymA: { title: 'Gym A', sub: 'Upper strength + power', where: 'Gym with mates', time: '4:00–5:00pm', dad: false, warm: 'upper', items: [
+    gymA: { title: 'Gym A', sub: 'Bench + upper strength', where: 'Gym with mates', time: '4:00–5:00pm', dad: false, warm: 'upper', items: [
       E('Med ball chest pass into wall', '3 × 5', 60, 'Throw as hard as possible. Every rep is max effort.', { tt: 'medicine ball chest pass wall' }),
       E('Med ball rotational throw', '3 × 4 each side', 60, 'Turn from the hips first, arms follow.', { tt: 'medicine ball rotational throw' }),
-      E('Dumbbell bench press', G('4 × 8', '4 × 6', '3 × 6', '3 × 6')[P], 90, 'Elbows about 45° from the body. Control down, push hard up.', { tt: 'dumbbell bench press form' }),
+      BIG('press', G('3 × 8', '4 × 5', '4 × 3', '3 × 3')[P], G(120, 150, 180, 180)[P], P === 3 ? 'After each set: 3 hard med ball chest passes into the wall. ' : ''),
       E('Chest-supported or seated cable row', G('4 × 10', '4 × 8', '3 × 8', '3 × 6')[P], 90, 'Pull elbows to back pockets, squeeze 1 sec.', { tt: 'chest supported row form' }),
       E('Assisted chin-up or lat pulldown', G('3 × 8', '4 × 6', '3 × 6', '3 × 6')[P], 90, 'Chest up to the bar, full hang at the bottom.', { tt: 'lat pulldown form' }),
       E('Seated DB shoulder press', G('3 × 10', '3 × 8', '3 × 8', '2 × 6')[P], 60, 'Ribs down, don’t arch the back.', { tt: 'seated dumbbell shoulder press form' }),
       E('Easy bike', G('15 min', '20 min', '20 min', '15 min')[P], 0, 'Can-still-talk pace. Builds the engine without hurting speed.', { tt: 'zone 2 cardio explained' })
     ] },
-    gymB: { title: 'Gym B', sub: 'Legs for muscle', where: 'Gym with mates', time: '4:00–5:00pm', dad: false, warm: 'lower', items: [
-      E('Leg press', G('4 × 10', '4 × 8', '3 × 6', '2 × 6')[P], 90, 'Feet shoulder width. Go deep without the lower back lifting off the seat.', { tt: 'leg press proper form' }),
-      E('DB Romanian deadlift', G('3 × 10', '3 × 8', '3 × 8', '2 × 6')[P], 90, 'Soft knees, hips back, feel the hamstring stretch, back flat.', { tt: 'dumbbell romanian deadlift form' }),
-      E('DB rear-foot-elevated split squat', G('3 × 8 each leg', '3 × 6 each leg', '3 × 6 each leg', '2 × 6 each leg')[P], 60, 'Front shin fairly upright. Drop the back knee straight down.', { tt: 'bulgarian split squat dumbbell form' }),
+    gymB: { title: 'Gym B', sub: 'Squat + deadlift + legs', where: 'Gym with mates', time: '4:00–5:00pm', dad: false, warm: 'lower', items: [
+      BIG('squat', G('3 × 8', '4 × 5', '4 × 3', '3 × 3')[P], G(120, 150, 180, 180)[P], P === 3 ? 'After each set: rest 30s, then 2 max broad jumps. ' : ''),
+      BIG('hinge', G('3 × 6', '4 × 5', '4 × 3', '2 × 3')[P], G(150, 180, 180, 180)[P]),
+      E('DB rear-foot-elevated split squat', G('2 × 8 each leg', '3 × 6 each leg', '2 × 6 each leg', '2 × 6 each leg')[P], 60, 'Front shin fairly upright. Drop the back knee straight down.', { tt: 'bulgarian split squat dumbbell form' }),
       E('Hamstring curl machine', G('3 × 10', '3 × 8', '3 × 8', '2 × 8')[P], 60, 'Slow on the way back (3 sec). Protects the hamstrings for sprinting.', { tt: 'hamstring curl machine form' }),
       E('Copenhagen plank, knee on bench', G('2 × 20s each side', '2 × 25s each side', '2 × 30s each side', '2 × 25s each side')[P], 45, 'Straight line, hips up. Protects the groin for side-steps.', { tt: 'copenhagen plank short lever' }),
       E('Calf raise', '3 × 12', 45, 'Full stretch at the bottom, pause at the top.', { tt: 'calf raise proper form' }),
@@ -117,52 +143,40 @@ function sessionFor(key, sp) {
       E('Neck work, lying on bench', '2 × 15 each way', 45, 'Front, back, sides with a light plate or band. Slow and LIGHT. Props need a strong neck for scrums and contact.', { tt: 'neck training rugby prop' }),
       E('Farmer’s carry', '3 × 20m', 60, 'Heaviest dumbbells he can hold with tall posture.', { tt: 'farmers carry form' })
     ] },
-    speedA: { title: 'Speed A', sub: 'Acceleration + jumps + squat', where: 'Backyard 30m track + garage', time: '4:00–5:00pm', dad: true, warm: 'speed', items: ({
+    speedA: { title: 'Speed A', sub: 'Acceleration + jumps', where: 'Backyard 30m track', time: '4:00–4:45pm', dad: true, warm: 'speed', items: ({
       1: [ E('Wall drives', '2 × 5 each leg', 60, 'Lean into the wall at 45°, straight body line. Drive the knee up, punch the foot down.', { tt: 'wall drive sprint drill' }),
            E('Falling starts', '4 × 10m', 90, 'Fall forward from tall. First step lands under the hips. Push the ground back.', { tt: 'falling start sprint drill' }),
            E('Prop-stance starts (3-point)', '3 × 10m', 90, CUE.prop, { tt: TT.prop }),
            E('20m accelerations', '3 × 20m', 150, CUE.acc20, { tt: TT.acc20 }),
            E('Box jump, knee height', '3 × 3', 60, CUE.box, { tt: TT.box }),
-           E('Broad jump', '3 × 3', 60, CUE.broad, { tt: TT.broad }),
-           E('Back squat · Dad spots', '3 × 8', 120, CUE.squat, { lift: 'squat', tt: TT.squat }) ],
+           E('Broad jump', '3 × 3', 60, CUE.broad, { tt: TT.broad }) ],
       2: [ E('Wall drives', '2 × 5 each leg', 60, 'Straight body line, drive the knee up, punch the foot down.', { tt: 'wall drive sprint drill' }),
            E('Sled sprint · start 20kg', '4 × 15m', 120, CUE.sled, { tt: TT.sled }),
            E('Prop-stance starts (3-point)', '4 × 10m', 90, CUE.prop, { tt: TT.prop }),
            E('20m accelerations', '3 × 20m', 150, CUE.acc20, { tt: TT.acc20 }),
            E('Box jump', '4 × 3', 60, CUE.box, { tt: TT.box }),
            E('Broad jump', '3 × 3', 60, CUE.broad, { tt: TT.broad }),
-           E('Single-leg hop', '2 × 3 each leg', 60, 'Hop forward, land on the same leg, hold 2 sec. Knee stays over the toes.', { tt: 'single leg hop and stick landing' }),
-           E('Back squat · Dad spots', '4 × 5', 150, CUE.squat, { lift: 'squat', tt: TT.squat }) ],
+           E('Single-leg hop', '2 × 3 each leg', 60, 'Hop forward, land on the same leg, hold 2 sec. Knee stays over the toes.', { tt: 'single leg hop and stick landing' }) ],
       3: [ E('Sled sprint · about 30kg', '3 × 15m', 150, CUE.sled, { tt: TT.sled }),
            E('Push-up starts', '3 × 10m', 90, 'Start chest-down on the grass. On “go”, pop up and sprint, like getting off the ruck.', { tt: 'push up start sprint drill' }),
            E('20m accelerations', '3 × 20m', 150, CUE.acc20, { tt: TT.acc20 }),
-           E('Depth jump off 30cm box', '3 × 3', 90, 'Step off (don’t jump off), land and bounce straight up as fast as possible.', { tt: 'depth jump technique' }),
-           E('Back squat + 2 broad jumps after each set', '4 × 3', 180, 'Squat set, rest 30s, then 2 max broad jumps. ' + CUE.squat, { lift: 'squat', tt: 'contrast training squat broad jump' }) ],
+           E('Depth jump off 30cm box', '3 × 3', 90, 'Step off (don’t jump off), land and bounce straight up as fast as possible.', { tt: 'depth jump technique' }) ],
       4: [ E('Prop-stance starts (3-point)', '4 × 10m', 90, CUE.prop, { tt: TT.prop }),
            E('Chase starts vs Dad or a mate', '4 × 15m', 120, 'Chaser starts 2m behind. Race it.', { tt: 'chase sprint drill' }),
            E('Box jump', '3 × 3', 60, CUE.box, { tt: TT.box }),
-           E('Broad jump', '2 × 3', 60, CUE.broad, { tt: TT.broad }),
-           E('Back squat · Dad spots', '3 × 3', 180, CUE.squat, { lift: 'squat', tt: TT.squat }) ]
+           E('Broad jump', '2 × 3', 60, CUE.broad, { tt: TT.broad }) ]
     })[P] },
-    speedB: { title: 'Speed B', sub: 'Agility + top speed + deadlift + bench', where: 'Field, then garage', time: '8:30–9:30am', dad: true, warm: 'speed', items: ({
+    speedB: { title: 'Speed B', sub: 'Agility + top speed', where: 'Football field', time: '8:30–9:15am', dad: true, warm: 'speed', items: ({
       1: [ E('5-10-5 shuttle', '4 (2 each way)', 90, CUE.shuttle, { tt: TT.shuttle }),
            E('45° cut drill: 5m, cut, 5m', '3 each side', 60, 'Plant the foot outside the hips. Lean the whole body, not just the head.', { tt: '45 degree cut drill' }),
-           E('Flying sprint: 20m build + 10m fly', '3 reps', 180, CUE.fly, { tt: TT.fly }),
-           E('Deadlift · Dad watches', '3 × 6', 150, CUE.dl, { lift: 'deadlift', tt: TT.dl }),
-           E('Barbell bench · Dad spots', '3 × 8', 120, CUE.bench, { lift: 'bench', tt: TT.bench }) ],
+           E('Flying sprint: 20m build + 10m fly', '3 reps', 180, CUE.fly, { tt: TT.fly }) ],
       2: [ E('5-10-5 shuttle', '4 (2 each way)', 90, CUE.shuttle, { tt: TT.shuttle }),
            E('Mirror drill with Dad', '4 × 5s', 60, 'Dad side-steps, he copies. Stay low, feet never cross.', { tt: 'mirror drill agility' }),
-           E('Flying sprint: 20m build + 10m fly', '4 reps', 180, CUE.fly, { tt: TT.fly }),
-           E('Deadlift · Dad watches', '4 × 5', 180, CUE.dl, { lift: 'deadlift', tt: TT.dl }),
-           E('Barbell bench · Dad spots', '4 × 5', 150, CUE.bench, { lift: 'bench', tt: TT.bench }) ],
+           E('Flying sprint: 20m build + 10m fly', '4 reps', 180, CUE.fly, { tt: TT.fly }) ],
       3: [ E('Reactive agility', '6 reps', 75, CUE.reactive, { tt: TT.reactive }),
-           E('Flying sprint: 20m build + 20m fly', '4 reps', 210, CUE.fly, { tt: TT.fly }),
-           E('Deadlift · Dad watches', '4 × 3', 180, CUE.dl, { lift: 'deadlift', tt: TT.dl }),
-           E('Barbell bench + 3 med ball chest passes after each set', '4 × 3', 180, CUE.bench, { lift: 'bench', tt: TT.bench }) ],
+           E('Flying sprint: 20m build + 20m fly', '4 reps', 210, CUE.fly, { tt: TT.fly }) ],
       4: [ E('Reactive agility', '6 reps', 75, CUE.reactive, { tt: TT.reactive }),
            E('Flying sprint: 20m build + 20m fly', '3 reps', 210, CUE.fly, { tt: TT.fly }),
-           E('Deadlift · Dad watches', '2 × 3', 180, CUE.dl, { lift: 'deadlift', tt: TT.dl }),
-           E('Barbell bench · Dad spots', '3 × 3', 180, CUE.bench, { lift: 'bench', tt: TT.bench }),
            E('Prop repeat efforts', '2 sets × 5', 180, 'Chest to ground, up, sprint 10m, walk back. 20s per rep, 3 min between sets.', { tt: 'rugby league repeat effort drill' }) ]
     })[P] },
     sand: { title: 'Sandhills', sub: 'School fitness at Greenhills · easy day from us', where: 'Greenhills with school', time: 'School', dad: false, warm: null, items: [
@@ -181,7 +195,7 @@ function sessionFor(key, sp) {
       E('Broad jump', 'Best of 3', 60, 'Two feet. Measure from the toe line to the back of the rear heel.', { tt: 'standing broad jump test' }),
       E('5-10-5 shuttle', '2 each way', 120, 'Record right-first and left-first separately.', { tt: TT.shuttle }),
       E('Chin-ups', '1 max set', 0, 'Full hang to chin over the bar. No kicking.', { tt: 'strict chin up form' }),
-      E('Squat, bench, deadlift', '3-rep max', 180, 'Do these at the next home session this week. Work up to a 3-rep max with perfect form; stop the moment form breaks.', { tt: 'how to test 3 rep max safely' })
+      E('Big lifts', '3-rep max', 180, 'At the gym this week: bench on Monday, squat and deadlift versions on Wednesday. Test the version he trains. Safety arms set, a mate spotting, and stop the moment form breaks.', { tt: 'how to test 3 rep max safely' })
     ] },
     rest: { title: 'Rest day', sub: 'Recovery is when the muscle gets built', where: 'Anywhere', time: '—', dad: false, warm: null, items: [] }
   };
