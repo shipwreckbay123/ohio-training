@@ -1,4 +1,5 @@
 /* ===== Ohio's off-season program: dates, sessions, meals, reminder lines =====
+   Training: 16-week program v2 (Offseason-16wk-v2.pdf), week 1 = Mon 30 Nov 2026.
    Plain script: pasted into the page by build.mjs, and run by build.mjs to make the iPhone reminder calendar. */
 
 /* ---------- Dates ---------- */
@@ -12,42 +13,84 @@ const fmt = (s, o = { weekday: 'short', day: 'numeric', month: 'short' }) => par
 const fmtShort = s => parse(s).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' });
 
 /* ---------- Key dates ---------- */
-const START = '2026-11-23';        // Phase 1 starts Monday 23 Nov
-const PRESEASON = '2027-04-05';    // club pre-season, early April
-const PHASES = [
+const START = '2026-11-23';          // app start (first program's Phase 1). Weigh-ins, streaks and meal prep count from here.
+const PROGRAM_START = '2026-11-30';  // 16-week program v2 (Offseason-16wk-v2.pdf), week 1
+const TRIALS = '2027-03-15';         // week 16, trials
+const BRIDGE = '2027-03-22';         // weeks 17–20 bridge block
+const PRESEASON = '2027-04-19';      // season proper starts after the bridge block (reminders run to here)
+const INSEASON = PRESEASON;
+// First program, only for the week before v2 started (so old logs still open)
+const OLD_PHASES = [
   { id: 'T', name: 'Test week', start: '2026-11-16', end: '2026-11-22', sp: 1, focus: 'Do the tests, learn the sessions',
     note: 'Test week. Do the tests on Saturday. Any other sessions this week are light: learn the moves and leave 3 in the tank.' },
-  { id: '1', name: 'Phase 1 · Foundation', start: '2026-11-23', end: '2026-12-20', sp: 1, focus: 'Technique, muscle, base fitness' },
-  { id: 'X', name: 'Christmas easy block', start: '2026-12-21', end: '2027-01-03', sp: 1, focus: 'Recover, keep the habit',
-    note: 'Easy fortnight: 3–4 sessions a week, drop 1 set from everything, no new PBs. School hols, so 9–10am is fine.' },
-  { id: '2', name: 'Phase 2 · Strength', start: '2027-01-04', end: '2027-01-31', sp: 2, focus: 'Heavier lifts, sled sprints start' },
-  { id: '3', name: 'Phase 3 · Power & speed', start: '2027-02-01', end: '2027-02-28', sp: 3, focus: 'Turn strength into speed: heavy + jump pairs, reactive agility' },
-  { id: '4', name: 'Phase 4 · Peak', start: '2027-03-01', end: '2027-03-28', sp: 4, focus: 'About 30% less volume, same intensity. Sharp and fresh',
-    note: 'Peak block: fewer sets, same weights. Quality only. If he feels flat, cut a set.' },
-  { id: 'Z', name: 'Taper week', start: '2027-03-29', end: '2027-04-04', sp: 4, focus: 'Half the sets, stay sharp, sleep and eat big',
-    note: 'Last week before pre-season. Do half the sets of each exercise at the same weight. Nothing new, nothing to failure.' },
-  { id: 'P', name: 'Pre-season', start: '2027-04-05', end: '2027-06-30', sp: 4, focus: 'Club pre-season. Club program comes first',
-    note: 'Pre-season: the club program comes first. On days without club training, use this session with half the sets.' }
+  { id: '1', name: 'Phase 1 · Foundation', start: '2026-11-23', end: '2026-11-29', sp: 1, focus: 'Technique, muscle, base fitness' }
 ];
-const TEST_DAYS = ['2026-11-21', '2026-12-19', '2027-01-30', '2027-02-27', '2027-03-23'];
+const PHASES = [
+  { id: 'B1', name: 'Block 1 · Foundation', start: '2026-11-30', end: '2026-12-27', weeks: '1–4', contacts: '40–60',
+    focus: 'Tissue, technique, acceleration base, first 1–2 kg. Week 1 is testing, week 4 is a deload.' },
+  { id: 'B2', name: 'Block 2 · Strength', start: '2026-12-28', end: '2027-01-24', weeks: '5–8', contacts: '60–90',
+    focus: 'Real kilos on the bar: intensity climbs to 82.5%. Hang power clean comes in. Week 8 deload + mid-point retest.' },
+  { id: 'B3', name: 'Block 3 · Power', start: '2027-01-25', end: '2027-02-21', weeks: '9–12', contacts: '90–110 (ceiling)',
+    focus: 'Turn strength into speed: cleans, depth jumps, contrast pairs. Week 12 deload.' },
+  { id: 'B4', name: 'Block 4 · Sharpen', start: '2027-02-22', end: '2027-03-21', weeks: '13–16', contacts: '60–80',
+    focus: 'Top speed, 30% less volume, arrive at trials fast and fresh. Week 16 taper + final tests.' },
+  { id: 'BR', name: 'Bridge block', start: '2027-03-22', end: '2027-04-18', weeks: '17–20',
+    focus: 'Ramp into the season alongside team training. Never walk straight out of a taper into a trial.' },
+  { id: 'IS', name: 'In-season', start: '2027-04-19', end: '2027-09-30', weeks: '',
+    focus: 'Minimum: one lower lift, one upper lift, one speed day. Nordics, Copenhagen planks and neck all season.' }
+];
+const OLD_TEST_DAYS = ['2026-11-21'];
+// Week 1 Mon + Wed, week 8 Wed + Thu, week 16 Tue + Thu
+const TEST_DAYS = [[1, 0], [1, 2], [8, 2], [8, 3], [16, 1], [16, 3]].map(([w, o]) => addDays(PROGRAM_START, 7 * (w - 1) + o));
 const REST_DAYS = ['2026-12-25', '2027-01-01'];
 const SCHOOL_HOLS = [['2026-12-18', '2027-01-27'], ['2027-04-12', '2027-04-23']];
-const WEEK = { 1: 'gymA', 2: 'speedA', 3: 'gymB', 4: 'sand', 5: 'gymC', 6: 'speedB', 0: 'rest' };
+const WEEK = { 1: 'gymA', 2: 'speedA', 3: 'gymB', 4: 'sand', 5: 'gymC', 6: 'speedB', 0: 'rest' }; // first program
 const inSchoolHols = d => SCHOOL_HOLS.some(([a, b]) => d >= a && d <= b);
+const WEEK_NOTE = {
+  1: 'Testing week. Mon speed tests, Tue rest, Wed strength tests, Thu–Fri light technique only. Real training starts week 2.',
+  4: 'Deload week: volume halves, weights drop to about 70%. This is where he actually gets stronger.',
+  8: 'Deload week + mid-point retest (Wed speed, Thu strength). Enter the new 5RMs and every weight for weeks 9–16 updates.',
+  12: 'Deload week: volume halves, weights drop to about 70%.',
+  16: 'Taper week + final tests. Sharp, not tired.'
+};
+const BLOCK_NOTE = {
+  B3: 'Heavy-lift gate: squat, bench and trap-bar sets above 85%, and cleans above 75%, need a coach technique check in the last 3 weeks. No coach? The app caps the weight there: same sets and reps, push bar speed.',
+  B4: 'The coach gate still applies: 92.5% sets need a recent sign-off.'
+};
 
+// Program week: 1–16, then 17–20 for the bridge block; 0 outside them
+function weekNo(d) {
+  if (d < PROGRAM_START || d >= INSEASON) return 0;
+  if (d >= BRIDGE) return 17 + Math.floor(daysBetween(BRIDGE, d) / 7);
+  return Math.floor(daysBetween(PROGRAM_START, d) / 7) + 1;
+}
+// sp is the program week for v2 dates (sessionFor uses it to pick the week's sets and reps)
 function phaseFor(d) {
-  if (d < PHASES[0].start) return PHASES[0];
-  return PHASES.find(p => d >= p.start && d <= p.end) || PHASES[PHASES.length - 1];
+  if (d < PROGRAM_START) return d < OLD_PHASES[0].start ? OLD_PHASES[0] : (OLD_PHASES.find(p => d >= p.start && d <= p.end) || OLD_PHASES[1]);
+  const p = PHASES.find(x => d >= x.start && d <= x.end) || PHASES[PHASES.length - 1], wk = weekNo(d);
+  const note = [WEEK_NOTE[wk], BLOCK_NOTE[p.id]].filter(Boolean).join(' ');
+  return { ...p, sp: wk, name: p.name + (wk ? ' · Week ' + wk : ''), note };
 }
 function keyFor(d) {
-  if (TEST_DAYS.includes(d)) return 'test';
+  const dow = parse(d).getDay();
+  if (d < PROGRAM_START) {
+    if (OLD_TEST_DAYS.includes(d)) return 'test';
+    const k = WEEK[dow];
+    return k === 'sand' && inSchoolHols(d) ? 'sandHols' : k;
+  }
   if (REST_DAYS.includes(d)) return 'rest';
-  const k = WEEK[parse(d).getDay()];
-  if (k === 'sand' && inSchoolHols(d)) return 'sandHols';
-  return k;
+  if (d >= INSEASON) return { 1: 'isL', 2: 'team', 3: 'isS', 4: 'isU', 5: 'team', 6: 'game', 0: 'rest' }[dow];
+  const w = weekNo(d);
+  if (w >= 17) return { 1: 'brL', 2: 'team', 3: 'brS', 4: 'brT', 5: 'team', 6: w === 17 ? 'F' : w === 20 ? 'game' : 'trial', 0: 'rest' }[dow];
+  const o = { 1: { 1: 'test1', 2: 'rest', 3: 'test2' }, 8: { 3: 'test1', 4: 'test2' }, 16: { 2: 'test1', 3: 'mob', 4: 'test2', 5: 'easy', 6: 'teamskills' } }[w];
+  if (o && o[dow]) return o[dow];
+  if (dow === 4) return inSchoolHols(d) ? 'D' : 'Dsand'; // Thursday: Session D, plus school sandhills in term
+  return { 1: 'A', 2: 'B', 3: 'C', 5: 'E', 6: 'F', 0: 'rest' }[dow];
 }
-const isTrainKey = k => k !== 'rest';
+const NOTRAIN_KEYS = ['rest', 'team', 'game', 'trial', 'teamskills', 'mob'];
+const isTrainKey = k => !NOTRAIN_KEYS.includes(k);
 const isSunday = d => parse(d).getDay() === 0;
+
 
 /* ---------- Warm-ups ---------- */
 const WARMUPS = {
@@ -86,33 +129,41 @@ const TT = {
   fly: 'flying sprint drill', shuttle: '5-10-5 pro agility drill', reactive: 'reactive agility drill rugby', sled: 'sled sprint technique'
 };
 
-/* ---------- Big lifts: done at the gym, he picks the version ----------
-   First option in each list is the default. Safety: barbell work only inside a rack with the safety arms set
-   just below the bottom of the rep, a mate spotting the bench, and never test a max alone. */
+
+/* ---------- Big lifts: the program's lift first, safer swaps after ----------
+   The first option is what the 16-week program prescribes, with weights from his tested 5RM.
+   Swaps have no tested max, so they go by feel (RPE 7–8). Safety: barbell work inside a rack with the
+   safety arms set just below the bottom of the rep, a mate spotting the bench, never test a max alone. */
 const VARIANTS = {
   squat: [
-    { lift: 'hacksquat', n: 'Hack squat machine', short: 'Hack squat', c: 'Feet shoulder width, mid-platform. Lower until thighs are parallel, drive up hard. The machine catches the weight, so it’s safe on his own.', tt: 'hack squat machine form' },
-    { lift: 'goblet', n: 'Goblet squat (dumbbell at chest)', short: 'Goblet', c: 'Hold one dumbbell against the chest, elbows inside the knees. Sit down between the heels, chest up. He can just drop the dumbbell if it goes wrong.', tt: 'goblet squat form' },
-    { lift: 'squat', n: 'Back squat · in a rack, safety arms set', short: 'Back squat', c: 'Only inside a squat rack with the safety arms set just below his lowest point. Big breath, tight belly, knees out, drive up fast.', tt: 'how to set safety arms squat rack' }
+    { lift: 'squat', pdf: true, n: 'Back squat · in a rack, safety arms set', short: 'Back squat', c: 'Inside a squat rack with the safety arms set just below his lowest point. Big breath, tight belly, knees out, hips just below knees, drive up fast.', tt: 'back squat technique beginner' },
+    { lift: 'hacksquat', safe: true, n: 'Hack squat machine', short: 'Hack squat', c: 'Feet shoulder width, mid-platform. Lower until thighs are parallel, drive up hard. The machine catches the weight, so it’s safe on his own.', tt: 'hack squat machine form' },
+    { lift: 'goblet', n: 'Goblet squat (dumbbell at chest)', short: 'Goblet', c: 'Hold one dumbbell against the chest, elbows inside the knees. Sit down between the heels, chest up.', tt: 'goblet squat form' }
   ],
   hinge: [
-    { lift: 'trapbar', n: 'Trap bar deadlift', short: 'Trap bar', c: 'Stand inside the hex bar, grip the high handles. Hips back, flat back, push the floor away. More upright than a normal deadlift, so it’s easier on the back.', tt: 'trap bar deadlift form' },
-    { lift: 'hipthrust', n: 'Hip thrust (barbell or machine)', short: 'Hip thrust', c: 'Upper back on a bench, pad on the hips. Drive through the heels, squeeze glutes at the top, chin tucked. Builds the hip drive for the first step.', tt: 'barbell hip thrust form' },
+    { lift: 'trapbar', pdf: true, safe: true, n: 'Trap-bar deadlift', short: 'Trap bar', c: 'Stand inside the hex bar, grip the high handles. Push the floor away, chest up, no yanking. One clean rep beats three ugly ones.', tt: 'trap bar deadlift form' },
     { lift: 'deadlift', n: 'Deadlift · a mate watching his back', short: 'Deadlift', c: 'Bar over mid-foot, flat back. Push the floor away, stand tall, don’t lean back. Stop the set if his back rounds.', tt: 'deadlift technique beginner' }
   ],
   press: [
-    { lift: 'bench', n: 'Barbell bench · safety arms or a mate spotting', short: 'Barbell', c: 'Never alone without the safety arms set just above chest height. Shoulder blades squeezed, feet planted, bar to lower chest, press up and slightly back.', tt: 'bench press safety arms setup' },
-    { lift: 'dbbench', n: 'Dumbbell bench press', short: 'Dumbbells', c: 'Elbows about 45° from the body. Control down, push hard up. If he fails a rep he can just lower the dumbbells to the floor.', tt: 'dumbbell bench press form' }
+    { lift: 'bench', pdf: true, n: 'Barbell bench · safety arms or a mate spotting', short: 'Barbell', c: 'Never alone without the safety arms set just above chest height. Shoulder blades squeezed, feet planted, bar to lower chest, press up and slightly back.', tt: 'bench press safety arms setup' },
+    { lift: 'dbbench', safe: true, n: 'Dumbbell bench press', short: 'Dumbbells', c: 'Elbows about 45° from the body. Control down, push hard up. If he fails a rep he can lower the dumbbells to the floor.', tt: 'dumbbell bench press form' }
   ]
 };
+// rm: the test result the program weights come from; div turns a 5RM into an estimated 1RM
 const LIFT_INFO = {
-  hacksquat: { name: 'Hack squat', start: 40, inc: [5, 120, 2.5] }, goblet: { name: 'Goblet squat', start: 24, inc: [2, 999, 2] }, squat: { name: 'Back squat', start: 45, inc: [5, 80, 2.5] },
-  trapbar: { name: 'Trap bar', start: 60, inc: [5, 120, 2.5] }, hipthrust: { name: 'Hip thrust', start: 60, inc: [5, 120, 2.5] }, deadlift: { name: 'Deadlift', start: 50, inc: [5, 100, 2.5] },
-  bench: { name: 'Bench', start: 62.5, inc: [2.5, 999, 2.5] }, dbbench: { name: 'DB bench (each hand)', start: 26, inc: [2, 999, 2] }
+  squat: { name: 'Back squat', start: 45, inc: [5, 80, 2.5], rm: 'sq5', div: 0.87 },
+  hacksquat: { name: 'Hack squat', start: 40, inc: [5, 120, 2.5] }, goblet: { name: 'Goblet squat', start: 24, inc: [2, 999, 2] },
+  trapbar: { name: 'Trap bar', start: 60, inc: [5, 120, 2.5], rm: 'tb5', div: 0.88 },
+  hipthrust: { name: 'Hip thrust', start: 60, inc: [5, 120, 2.5] }, deadlift: { name: 'Deadlift', start: 50, inc: [5, 100, 2.5] },
+  bench: { name: 'Bench', start: 62.5, inc: [2.5, 999, 2.5], rm: 'bp5', div: 0.87 },
+  dbbench: { name: 'DB bench (each hand)', start: 26, inc: [2, 999, 2] },
+  clean: { name: 'Hang clean', start: 40, inc: [2.5, 999, 2.5], rm: 'cl1', div: 1 }
 };
-const BIG = (slot, d, r, extra) => E(slot, d, r, '', { slot, extra: extra || '' });
+// BIG(slot, dose, rest, extra cue, % of 1RM): one of the big lifts, version picked on the day
+const BIG = (slot, d, r, extra, pct) => E(slot, d, r, '', { slot, extra: extra || '', pct: pct || 0 });
 
-function sessionFor(key, sp) {
+// The first program (up to 29 Nov 2026), kept so old logs still open
+function legacySession(key, sp) {
   const P = sp;
   const S = {
     gymA: { title: 'Gym A', sub: 'Bench + upper strength', where: 'Gym with mates', time: '4:00–5:00pm', dad: false, warm: 'upper', items: [
@@ -202,8 +253,295 @@ function sessionFor(key, sp) {
   return S[key];
 }
 
+/* ---------- 16-week program v2 sessions (from Mon 30 Nov 2026) ---------- */
+WARMUPS.std = { title: 'Standard warm-up · 12 min · no skipping', items: [
+  ['Bike or row, easy', '3 min', ''], ['Ankle rocks, leg swings, hip openers', '10 / 10 / 8 each side', 'ankle rocks leg swings hip openers warm up'],
+  ['Pogo hops, then A-march', '2 × 10, 2 × 10m', 'pogo hops A march drill'], ['Band pull-aparts, band external rotation', '15, 12 each side', 'band pull aparts external rotation'],
+  ['Ramp-up on the first main lift: bar, 40%, 60%, 75%', '8, 5, 3, 2 reps', 'warm up sets before heavy squat'] ] };
+const C2 = {
+  squat: CUE.squat, bench: CUE.bench, box: CUE.box, broad: CUE.broad, shuttle: CUE.shuttle, fly: CUE.fly,
+  clean: 'Hips, not arms: the arms are just ropes. Fast elbows, catch high. Jump and shrug. Stop the set the moment the bar slows.',
+  rdl: 'Soft knees, hips back, flat back. Feel the hamstring stretch, then drive the hips through.',
+  nordic: 'Kneel with ankles anchored. Lower as slowly as you can, catch with your hands, push back up.',
+  cph: 'Top leg on the bench, body in a straight line, hips up. Each side. Protects the groin.',
+  accel10: 'A primer, not speed work. Walk back. Stop if the last two look worse than the first.',
+  depth: 'Step off (don’t jump off). Land silent on the balls of the feet, bounce straight up. Loud landing = lower the box. Knees caving = stop. Max 12 a session.',
+  depthSprint: 'Step off, land, and sprint 10m straight away. Silent landing, knees over toes.',
+  sprint: 'Full rest: walk back. Gasping = not sprinting. Stop when times drop.',
+  maxv: 'Tall and relaxed, claw the ground back, don’t reach. 20–30m build-up before every flying rep. Full rest.',
+  neck: 'Front, back, both sides. Slow and controlled, harness or hand resistance.',
+  face: 'Pull the rope to the forehead, thumbs back. Keeps the shoulders healthy.',
+  row: 'Flat back, pull to the hip, squeeze 1 sec. Each arm.',
+  chin: 'Full hang to chin over the bar. Stop each set 2 reps short of failure. Can’t do 5 strict? Use a band, or 5 × 4-second negatives.',
+  wchin: 'Weight on a belt or a DB between the feet. Full hang every rep, no kicking.',
+  ohp: 'Standing. Ribs down, glutes tight, press straight up.',
+  pushpress: 'Short dip with the knees, drive with the legs, lock out overhead. Ribs down.',
+  incline: 'Bench at about 30°. Control the stretch, press hard.',
+  csrow: 'Chest on the bench so the back can’t cheat. Pull elbows to the back pockets.',
+  hipthrust: 'Upper back on the bench, chin tucked. Drive through the heels, squeeze 1 sec at the top.',
+  lunge: 'Long step back, back knee drops straight down, push through the front heel. Each leg.',
+  backext: '45° bench. Hinge at the hips, flat back, squeeze the glutes at the top. Don’t over-arch.',
+  pallof: 'Arms straight out, resist the cable trying to twist you. Each side.',
+  calf: 'Full stretch at the bottom, pause at the top.',
+  farmer: 'Heaviest dumbbells he can hold with tall posture. 20m per trip.',
+  mb: 'Max intent every rep. Turn from the hips first, arms follow.',
+  slam: 'Reach tall, slam through the floor. Every rep max effort.',
+  split: 'Front shin fairly upright, back knee drops straight down. Each leg.',
+  jumpsq: 'Light bar (about 20–30% of squat 1RM). Jump as high as possible, land soft, reset each rep.',
+  jpush: 'Explode so the hands leave the floor (clap if you can). Land soft, reset.',
+  chestThrow: '2–3 kg ball, right after the bench set. Throw as hard as possible.',
+  decel: 'Sprint 10m, brake hard into a balanced 2 s hold, reset 5m. Low hips, short choppy steps. Each side.',
+  partner: 'Dad points left or right as he reaches the cone. React, don’t guess. Full rest.',
+  mirror: 'Dad or a mate moves, he copies. Stay low, feet never cross. No contact.',
+  ball: 'React to a rolled or bounced ball: 2m cut, then accelerate hard.',
+  chase: '5m grid: evade the chaser for 15 s. Full rest between reps.',
+  evade: '10m channel, attacker vs defender, no contact. Work the outside shoulder.',
+  snap: 'Rise on the toes, snap down fast into a quiet athletic landing, hold 2 s, then jump.',
+  tempo: '70%: steady, can talk in short sentences. 1 min rest between runs. Capped at 15 min.',
+  mech: 'Tall posture, shin angled forward at the start, arms driving, push the ground away, don’t reach with the lead foot.',
+  five: 'Build in 10% jumps, 3 reps each, until 3 reps feel like RPE 8. Then one set of 5. Moved clean? Add 5 kg and go again. Stop at the first set where rep 5 slows badly. No grinding. A mate spotting, safety arms set.'
+};
+const ttFor = n => n.replace(/\s*[(·,:].*$/, '').toLowerCase() + ' technique';
+const X = (n, d, r, c, extra) => d == null ? null : E(n, d, r, c, { tt: ttFor(n), ...(extra || {}) });
+const SL = (slot, spec, r, extra) => { if (!spec) return null; const [s, reps, pct] = spec; return BIG(slot, pct ? `${s} × ${reps} @ ${pct}%` : `${s} × ${reps}`, r, extra, pct); };
+const CL = (spec, r) => { if (!spec) return null; const [s, reps, pct] = spec; return E('Hang power clean', `${s} × ${reps} @ ${pct}%`, r, C2.clean, { lift: 'clean', pct, tt: 'hang power clean technique' }); };
+const durability = () => [X('Nordic curl', '2 × 5', 90, C2.nordic), X('Copenhagen plank', '2 × 30 s each side', 60, C2.cph), X('Neck', '2 × 15 each way', 60, C2.neck, { tt: 'neck training rugby prop' })];
+const SLOT = { A: ['4:00–5:20pm', 'Gym', false], B: ['4:00–5:20pm', 'Field, then gym', true], C: ['4:00–4:55pm', 'Backyard track or field', true],
+  D: ['4:00–5:15pm', 'Gym', false], Dsand: ['After school', 'Gym, after school sandhills', false], E: ['4:00–5:10pm', 'Gym, then field', false], F: ['9:00–9:45am', 'Home or club', false] };
+const NOTRAIN = {
+  rest: { title: 'Rest day', sub: 'Recovery is when the muscle gets built', where: 'Anywhere', time: '—', dad: false, warm: null, items: [] },
+  team: { title: 'Team training', sub: 'Club session. Nothing extra from this program today.', where: 'Club', time: 'Club time', dad: false, warm: null, items: [] },
+  game: { title: 'Game day', sub: 'Play well. Big carb meal the night before.', where: 'Club', time: 'Game time', dad: false, warm: null, items: [] },
+  trial: { title: 'Trial', sub: 'Warm up properly and empty the tank.', where: 'Club', time: 'Trial time', dad: false, warm: null, items: [] },
+  teamskills: { title: 'Team session', sub: 'Team session or skills only. Nothing extra.', where: 'Club', time: 'Club time', dad: false, warm: null, items: [] },
+  mob: { title: 'Rest or mobility', sub: 'Optional 20 min mobility: hips, ankles, upper back', where: 'Anywhere', time: '—', dad: false, warm: null, items: [] }
+};
+const SAT_F = () => ({ title: 'Session F', sub: 'Easy day: skills + durability', time: SLOT.F[0], where: SLOT.F[1], dad: false, mins: 45, warm: 'std',
+  note: 'He should finish feeling better than when he started. No wrestling, no max efforts, nothing timed.', items: [
+  X('Light movement', '8 min', 0, '5 min bike or walk, A-skips, 2–3 easy build-ups. Nothing timed.', { tt: '' }),
+  X('Tackle technique', '10–12 reps', 0, 'On bags only, at walk-through speed. Live contact belongs at team training.', { tt: 'rugby league tackle technique bag' }),
+  X('Grip', '3 × 20m', 60, 'Towel hang or a light farmer’s hold.', { tt: 'towel hang grip training' }),
+  X('Neck + shoulders', 'Neck 3 × 15 · Y-T-W 2 × 12 · ER 2 × 15', 45, C2.neck + ' Then Y-T-W raises and band external rotation.', { tt: 'neck training rugby prop' }),
+  X('Mobility', '15 min', 0, 'Hips, ankles, upper-back flow.', { tt: 'hip ankle thoracic mobility routine' })
+] });
+
+function newSession(key, wk) {
+  if (NOTRAIN[key]) return NOTRAIN[key];
+  const j = wk >= 17 ? wk - 17 : Math.max(0, wk - 1) % 4, blk = wk <= 4 ? 1 : wk <= 8 ? 2 : wk <= 12 ? 3 : 4;
+  const pick = a => a[j];
+  const slot = SLOT[key] || ['4:00pm–', 'Gym', false];
+  const build = (title, sub, mins, items, extra = {}) => ({ title, sub, mins, time: slot[0], where: slot[1], dad: slot[2], warm: 'std', items: items.filter(Boolean), ...extra });
+  const sand = key === 'Dsand' ? X('Sandhills with school', 'Whatever the coach sets', 0, 'His hard fitness for the week. Drive the arms, short quick steps up, walk down. Then Session D after school; if his legs are cooked, cut the accessories and keep the trap bar.', { tt: 'sand dune hill sprints technique' }) : null;
+
+  if (key === 'test1') {
+    const full = wk !== 8;
+    return build('Test Day 1', 'Speed, jumps, agility · film it', 60, [
+      X('Body weight', 'Morning', 0, 'After the toilet, before food.' + (full ? ' Also height, and a front and side photo.' : ''), { tt: '' }),
+      X('10, 20 and 40m sprint', 'Best of 2', 180, 'Full rest between runs. Same surface and boots every time. Film side-on; take the 10 and 20m splits from the 40.', { tt: 'how to time 40m sprint with phone slow motion' }),
+      X('Vertical jump', 'Best of 3', 60, 'Chalk fingers. Side-on to a wall, mark the standing reach. Jump and touch high. The gap is the jump in cm.', { tt: 'vertical jump test wall' }),
+      X('Broad jump', 'Best of 3', 60, 'Two feet. Toe line to the back of the rear heel.', { tt: 'standing broad jump test' }),
+      full ? X('5-10-5 shuttle', 'Best of 2 each way', 120, 'Record right-first and left-first separately.', { tt: TT.shuttle }) : null
+    ], { time: 'Fresh, after an easy day', where: 'Field (same surface and boots each time)', dad: true,
+      note: wk === 8 ? 'Mid-point retest. Compare with week 1.' : wk === 16 ? 'Final tests. Compare with week 1.' : 'Baseline. Every weight in the program comes from these numbers.' });
+  }
+  if (key === 'test2') {
+    const full = wk !== 8;
+    return build('Test Day 2', 'Strength · 5RM tests', 75, [
+      X('5RM back squat', 'Build to a 5RM', 180, C2.five, { tt: 'how to test 5 rep max safely' }),
+      X('5RM bench press', 'Build to a 5RM', 180, C2.five, { tt: 'bench press safety arms setup' }),
+      X('5RM trap-bar deadlift', 'Build to a 5RM', 180, C2.five, { tt: 'trap bar deadlift form' }),
+      full ? X('Strict chin-up max', '1 max set', 0, 'Full hang to chin over the bar. No kicking.', { tt: 'strict chin up form' }) : null,
+      full ? X('Beep test or Yo-Yo IR1', 'Last thing', 0, 'Same course and surface each time.', { tt: 'beep test how to' }) : null
+    ], { time: '4:00–5:15pm', where: 'Gym', dad: true,
+      note: 'Enter the 5RMs on the Progress tab. The app works out every working weight from them (1RM = 5RM ÷ 0.87 for squat and bench, ÷ 0.88 for trap bar).' });
+  }
+  if (key === 'easy') return build('Easy movement', '20 min, no lifting', 20, [X('Easy movement', '20 min', 0, 'Bike, walk, light skips. No lifting.', { tt: '' })], { warm: null, time: 'Any time', where: 'Anywhere' });
+
+  /* Bridge block, weeks 17–20 */
+  if (key === 'brL') return build('Lift · lower', `Bridge week ${wk}`, 50, [
+    SL('squat', pick([[4, 5, 75], [4, 4, 80], [3, 3, 85], [3, 3, 80]]), 180), wk === 17 ? SL('press', [4, 5, 75], 150) : null, ...durability()], { time: '4:00–4:50pm', where: 'Gym' });
+  if (key === 'brS') return build('Speed', `Bridge week ${wk}`, 30, [X('Sprints', pick(['4 × 20m', '3 × 30m', '2 × 40m', '2 × 30m']), 180, C2.sprint, { tt: TT.acc20 })], { time: '4:00–4:30pm', where: 'Backyard track or field', dad: true });
+  if (key === 'brT') return wk === 17
+    ? build('Lift · hinge', 'Bridge week 17', 50, [SL('hinge', [4, 5, 0], 150), X('Hang power clean', '4 × 3 light', 120, C2.clean, { lift: 'clean', tt: 'hang power clean technique' }), ...durability()], { time: '4:00–4:50pm', where: 'Gym' })
+    : build('Light lift', `Bridge week ${wk} · keep it easy`, 40, [SL('hinge', [3, 3, 70], 150), SL('press', [3, 3, 70], 150), ...durability()], { time: '4:00–4:40pm', where: 'Gym' });
+  /* In-season minimum */
+  if (key === 'isL') return build('In-season lift · lower', 'Minimum dose', 40, [SL('squat', [3, 3, 80], 180), ...durability().slice(0, 2)], { time: '4:00–4:40pm', where: 'Gym' });
+  if (key === 'isS') return build('In-season speed', 'Short and sharp', 25, [X('Sprints', '3 × 20m', 150, C2.sprint, { tt: TT.acc20 }), X('Flying 20m', '2 reps', 180, C2.maxv, { tt: TT.fly })], { time: '4:00–4:25pm', where: 'Backyard track or field' });
+  if (key === 'isU') return build('In-season lift · upper', 'Minimum dose', 40, [SL('press', [3, 3, 80], 180), X('Weighted chin-up', '3 × 3', 120, C2.wchin), X('Neck', '2 × 15 each way', 60, C2.neck, { tt: 'neck training rugby prop' })], { time: '4:00–4:40pm', where: 'Gym' });
+
+  if (key === 'F') return SAT_F();
+  const light = wk === 1 && (key === 'D' || key === 'Dsand' || key === 'E') ? { note: 'Week 1: light technique work only. Practise the movements at easy weights. Real training starts next week.' } : {};
+  const isD = key === 'D' || key === 'Dsand';
+
+  if (blk === 1) {
+    if (key === 'A') return build('Session A', 'Lower strength + jumps', 80, [
+      X('Snap-down to jump', pick(['3 × 5', '3 × 5', '4 × 4', '2 × 4']), 90, C2.snap),
+      X('Box jump', pick(['3 × 4 @ 40 cm', '4 × 4 @ 45 cm', '4 × 4 @ 50 cm', '2 × 4 @ 40 cm']), 90, C2.box, { tt: TT.box }),
+      SL('squat', pick([[4, 7, 67.5], [4, 7, 72], [4, 6, 77], [2, 6, 65]]), 165),
+      X('Romanian deadlift', pick(['3 × 8 @ RPE 7', '3 × 8', '4 × 6', '2 × 8']), 90, C2.rdl),
+      X('DB split squat', pick(['3 × 8 each leg', '3 × 9 each leg', '3 × 10 each leg', '2 × 8 each leg']), 75, C2.split, { tt: 'dumbbell split squat form' }),
+      X('Nordic curl (4 s lower)', pick(['3 × 4', '3 × 5', '3 × 5', '2 × 4']), 90, C2.nordic),
+      X('Copenhagen plank', pick(['3 × 20 s', '3 × 25 s', '3 × 30 s', '2 × 20 s']), 60, C2.cph, { tt: 'copenhagen plank short lever' }),
+      X('10m acceleration, 2-point start', pick(['6 reps', '6 reps', '6 reps', '4 reps']), 45, C2.accel10, { tt: 'two point stance sprint start' })]);
+    if (key === 'B') return build('Session B', 'Agility first, then upper strength', 80, [
+      X('Deceleration drill', pick(['4 each side', '4 each side', '5 each side', '3 each side']), 60, C2.decel),
+      X('5-10-5 shuttle', pick(['3 each way', '4 each way', '4 each way', '2 each way']), 90, C2.shuttle, { tt: TT.shuttle }),
+      SL('press', pick([[4, 7, 67.5], [4, 7, 72], [4, 6, 77], [2, 6, 65]]), 150),
+      X('Chin-up, 2 in reserve', pick(['3 sets', '3 sets', '4 sets', '2 sets']), 90, C2.chin, { tt: 'strict chin up form' }),
+      X('Single-arm DB row', pick(['3 × 10', '3 × 10', '3 × 11', '2 × 10']), 75, C2.row),
+      X('Standing DB overhead press', pick(['3 × 8', '3 × 9', '3 × 9', '2 × 8']), 75, C2.ohp),
+      X('Face pull', pick(['3 × 20', '3 × 20', '3 × 20', '2 × 20']), 60, C2.face, { tt: 'face pulls cable form' }),
+      X('Neck (harness or manual)', pick(['3 × 15 each way', '3 × 15 each way', '3 × 15 each way', '2 × 15 each way']), 60, C2.neck, { tt: 'neck training rugby prop' })]);
+    if (key === 'C') return build('Session C', 'Speed + plyometrics · no conditioning', 55, pick([
+      [X('Mechanics', '12 min', 0, 'A-skips, B-skips, wall drills, ankle pops. ' + C2.mech, { tt: 'A skip B skip sprint drills' }), X('10m sprints, standing start', '6 reps', 60, C2.sprint, { tt: TT.acc20 }), X('Pogo hops', '2 × 10', 60, 'Stiff ankles, quick off the ground.'), X('Box jump', '3 × 4 @ 40 cm', 90, C2.box, { tt: TT.box }), X('Finish', '5 min', 0, 'Walk, then stretch.', { tt: '' })],
+      [X('Mechanics + falling starts', '12 min · 4 falling starts', 0, 'A-skips, B-skips, wall drills, ankle pops. ' + C2.mech, { tt: 'falling start sprint drill' }), X('10m sprints, falling start', '8 reps', 60, C2.sprint, { tt: 'falling start sprint drill' }), X('Box jump', '4 × 4 @ 45 cm', 90, C2.box, { tt: TT.box }), X('Broad jump', '3 × 3', 90, C2.broad, { tt: TT.broad }), X('Finish', '5 min', 0, 'Walk, then stretch.', { tt: '' })],
+      [X('Mechanics + 3-point starts', '12 min · 4 starts', 0, 'A-skips, B-skips, wall drills, ankle pops. ' + C2.mech, { tt: TT.prop }), X('15m sprints from 3-point', '6 reps', 75, C2.sprint, { tt: TT.prop }), X('Broad jump', '4 × 3', 90, C2.broad, { tt: TT.broad }), X('Lateral bound', '3 × 5 each side', 75, 'Bound sideways off one leg, stick the landing on the other for 2 s.'), X('Finish', '5 min', 0, 'Walk, then stretch.', { tt: '' })],
+      [X('Mechanics only, easy', '12 min', 0, C2.mech, { tt: 'A skip B skip sprint drills' }), X('10m sprints, easy', '4 reps', 60, C2.sprint, { tt: '' }), X('Jumps', '2 × 4', 90, 'Any easy jump. Quality only.', { tt: '' }), X('Finish', '5 min', 0, 'Walk, then stretch.', { tt: '' })]
+    ]), { note: 'Jump contacts this block: 40–60 a week. That’s deliberately low.' });
+    if (isD) return build('Session D', 'Hinge + posterior chain', 75, [sand,
+      SL('hinge', pick([[4, 6, 65], [4, 6, 70], [5, 5, 75], [2, 5, 65]]), 165),
+      X('Barbell hip thrust', pick(['3 × 10', '3 × 12', '4 × 10', '2 × 10']), 90, C2.hipthrust),
+      X('DB reverse lunge', pick(['3 × 8 each leg', '3 × 9 each leg', '3 × 10 each leg', '2 × 8 each leg']), 75, C2.lunge),
+      X('45° back extension', pick(['3 × 12', '3 × 12', '3 × 15', '2 × 12']), 60, C2.backext, { tt: '45 degree back extension form' }),
+      X('Pallof press', pick(['3 × 12 each side', '3 × 12 each side', '3 × 15 each side', '2 × 12 each side']), 60, C2.pallof),
+      X('Standing calf raise', pick(['3 × 15', '3 × 15', '3 × 20', '2 × 15']), 60, C2.calf),
+      X('Heavy farmer’s carry', pick(['2 trips', '3 trips', '3 trips', '2 trips']), 90, C2.farmer, { tt: 'farmers carry form' })], light);
+    if (key === 'E') return build('Session E', 'Upper power + conditioning', 70, [
+      X('Med ball slam / rotational throw', pick(['3 × 4 each', '4 × 4 each', '4 × 5 each', '2 × 4 each']), 60, C2.mb, { tt: 'medicine ball rotational throw' }),
+      X('Incline DB press', pick(['3 × 10', '3 × 10', '3 × 11', '2 × 10']), 90, C2.incline),
+      X('Push press', pick(['3 × 6', '3 × 6', '3 × 7', '2 × 6']), 90, C2.pushpress),
+      X('Chest-supported row', pick(['3 × 10', '3 × 10', '3 × 11', '2 × 10']), 75, C2.csrow),
+      X('Face pull', pick(['3 × 20', '3 × 20', '3 × 20', '2 × 20']), 60, C2.face, { tt: 'face pulls cable form' }),
+      X('Tempo runs: 4 min @ 70%', pick(['1 run', '3 runs', '3 runs', '2 runs']), 60, C2.tempo, { tt: 'tempo runs conditioning' })], light);
+  }
+  if (blk === 2) {
+    if (key === 'A') return build('Session A', 'Lower strength + clean technique', 80, [
+      X('Box jump', pick(['3 × 4 @ 50 cm', '4 × 4 @ 55 cm', '4 × 3 @ 55 cm', '2 × 4 @ 40 cm']), 90, C2.box, { tt: TT.box }),
+      j === 0 ? X('Hang power clean (technique)', '5 × 3 light · RPE 5', 120, C2.clean + ' Coach check this week, before it gets loaded.', { lift: 'clean', tt: 'hang power clean technique' })
+              : CL(pick([null, [5, 3, 60], [5, 3, 65], [3, 2, 60]]), 120),
+      SL('squat', pick([[5, 5, 77.5], [5, 5, 80], [4, 5, 82.5], [3, 4, 70]]), 180),
+      X('Romanian deadlift', pick(['4 × 6', '4 × 6', '4 × 6', '2 × 6']), 90, C2.rdl),
+      X('Split squat', pick(['3 × 8 each leg', '3 × 8 each leg', '3 × 8 each leg', '2 × 8 each leg']), 75, C2.split, { tt: 'dumbbell split squat form' }),
+      X('Nordic curl (5 s lower)', pick(['3 × 5', '3 × 6', '3 × 6', '2 × 5']), 90, C2.nordic),
+      X('Copenhagen plank', pick(['3 × 30 s', '3 × 35 s', '3 × 35 s', '2 × 25 s']), 60, C2.cph, { tt: 'copenhagen plank short lever' }),
+      X('10m acceleration', pick(['6 reps', '6 reps', '6 reps', '4 reps']), 45, C2.accel10, { tt: 'two point stance sprint start' })]);
+    if (key === 'B') return build('Session B', 'Reactive agility + upper', 80, [
+      X('Partner-cued 5-10-5', pick(['6 reps', '8 reps', '8 reps', '4 reps']), 90, C2.partner, { tt: TT.reactive }),
+      X('Mirror drill, 20 s', pick(['3 reps', '4 reps', '4 reps', '2 reps']), 60, C2.mirror, { tt: 'mirror drill agility' }),
+      SL('press', pick([[5, 5, 77.5], [5, 5, 80], [4, 5, 82.5], [3, 4, 70]]), 180),
+      X('Weighted chin-up', pick(['5 × 3', '5 × 3', '4 × 3', '3 × 2']), 120, C2.wchin),
+      X('Single-arm DB row', pick(['4 × 8', '4 × 8', '4 × 8', '2 × 8']), 75, C2.row),
+      X('Push press', pick(['4 × 5', '4 × 5', '4 × 4', '2 × 5']), 90, C2.pushpress),
+      X('Face pull + external rotation', pick(['3 × 20', '3 × 20', '3 × 20', '2 × 20']), 60, C2.face, { tt: 'face pulls cable form' }),
+      X('Neck', pick(['3 × 15 each way', '3 × 15 each way', '3 × 15 each way', '2 × 15 each way']), 60, C2.neck, { tt: 'neck training rugby prop' })]);
+    if (key === 'C') return build('Session C', 'Speed', 55, pick([
+      [X('Box jump', '3 × 4', 90, C2.box, { tt: TT.box }), X('20m free sprints', '4 reps', 150, C2.sprint, { tt: TT.acc20 }), X('10m from 3-point', '3 reps', 75, C2.sprint, { tt: TT.prop })],
+      [X('Box jump', '3 × 4', 90, C2.box, { tt: TT.box }), X('20m resisted sprints', '4 reps', 150, 'Sled or band, 10–15% of body weight. Push the ground back, don’t lean. ' + CUE.sled, { tt: TT.sled }), X('20m free sprints', '3 reps', 150, C2.sprint, { tt: TT.acc20 })],
+      [X('Box jump', '3 × 4', 90, C2.box, { tt: TT.box }), X('25m free sprints', '4 reps', 150, C2.sprint, { tt: TT.acc20 }), X('Flying 10m (20m build, 10m flat out)', '3 reps', 180, C2.fly, { tt: TT.fly })],
+      [X('20m sprints, easy', '4 reps', 120, 'Deload. Smooth and relaxed.', { tt: '' })]
+    ]), { note: 'Jump contacts this block: 60–90 a week.' });
+    if (isD) return build('Session D', 'Posterior chain', 75, [sand,
+      SL('hinge', pick([[5, 5, 77.5], [4, 5, 82.5], [4, 4, 87.5], [3, 4, 70]]), 180),
+      X('Hip thrust', pick(['4 × 10', '4 × 10', '4 × 8', '2 × 10']), 90, C2.hipthrust, { tt: 'barbell hip thrust form' }),
+      X('Reverse lunge', pick(['3 × 8 each leg', '3 × 8 each leg', '3 × 8 each leg', '2 × 8 each leg']), 75, C2.lunge),
+      X('Back extension', pick(['3 × 12', '3 × 15', '3 × 15', '2 × 12']), 60, C2.backext, { tt: '45 degree back extension form' }),
+      X('Pallof press', pick(['3 × 12 each side', '3 × 12 each side', '3 × 15 each side', '2 × 12 each side']), 60, C2.pallof),
+      X('Calf raise', pick(['3 × 20', '3 × 20', '3 × 20', '2 × 15']), 60, C2.calf),
+      X('Farmer’s carry', pick(['3 trips', '4 trips', '4 trips', '2 trips']), 90, C2.farmer, { tt: 'farmers carry form' })]);
+    if (key === 'E') return build('Session E', 'Upper power + conditioning', 70, [
+      X('Med ball rotational throw', pick(['4 × 4 each', '4 × 4 each', '5 × 3 each', '3 × 4 each']), 60, C2.mb, { tt: 'medicine ball rotational throw' }),
+      X('Incline DB press', pick(['3 × 10', '3 × 10', '3 × 8', '2 × 10']), 90, C2.incline),
+      X('Weighted chin-up', pick(['4 × 5', '4 × 5', '4 × 4', '2 × 5']), 120, C2.wchin),
+      X('Chest-supported row', pick(['4 × 8', '4 × 8', '4 × 8', '2 × 8']), 75, C2.csrow),
+      X('Conditioning', '6 × 60m @ 85% or 12 min small-sided game', 60, 'Builds the engine. The one conditioning session of the week.', { tt: 'rugby league conditioning drills' }),
+      X('1-on-1 wrestling from knees', '3 × 45 s', 60, 'Controlled, with a sensible partner.', { tt: 'rugby league wrestle training' }),
+      X('Grip fights', '3 × 30 s', 45, 'Win the hand fight, then reset.', { tt: '' })]);
+  }
+  if (blk === 3) {
+    if (key === 'A') return build('Session A', 'Contrast power', 80, [
+      X('Depth jump, 40 cm box', pick(['3 × 3', '3 × 3', '3 × 3', '2 × 3']), 90, C2.depth, { tt: 'depth jump technique' }),
+      CL(pick([[6, 3, 70], [6, 2, 75], [6, 2, 80], [3, 2, 65]]), 150),
+      SL('squat', pick([[4, 4, 85], [4, 4, 87.5], [4, 3, 90], [3, 3, 72.5]]), 180),
+      X('Jump squat, right after squats', pick(['3 × 5', '3 × 5', '4 × 4', '2 × 4 light']), 90, C2.jumpsq),
+      X('Romanian deadlift', pick(['3 × 5', '3 × 5', '3 × 5', '2 × 6']), 90, C2.rdl),
+      X('Split squat', pick(['3 × 8 each leg', '3 × 8 each leg', '3 × 8 each leg', '2 × 8 each leg']), 75, C2.split, { tt: 'dumbbell split squat form' }),
+      X('Nordic curl (5 s lower)', pick(['3 × 6', '4 × 5', '4 × 5', '2 × 4']), 90, C2.nordic),
+      X('Copenhagen plank', pick(['3 × 35 s', '3 × 40 s', '3 × 40 s', '2 × 25 s']), 60, C2.cph, { tt: 'copenhagen plank short lever' })],
+      { note: 'The first exercise matters most. Flat? Cut the accessories, never the jumps or the clean.' });
+    if (key === 'B') return build('Session B', 'Rugby-reactive agility + upper power', 80, [
+      X('Ball-reactive drill', pick(['6 reps', '8 reps', '8 reps', '4 reps']), 75, C2.ball, { tt: TT.reactive }),
+      X('Chase-and-evade, 15 s', pick(['3 reps', '3 reps', '4 reps', '2 reps']), 75, C2.chase, { tt: 'chase and evade agility drill' }),
+      X('1-on-1 evasion, 10m channel', '3 reps', 75, C2.evade, { tt: 'rugby league evasion drill' }),
+      SL('press', pick([[4, 4, 85], [4, 4, 87.5], [4, 3, 90], [3, 3, 72.5]]), 180),
+      X('Med ball chest throw', pick(['3 × 5', '3 × 5', '4 × 3', '2 × 4']), 60, C2.chestThrow, { tt: 'medicine ball chest pass wall' }),
+      X('Weighted chin-up', pick(['4 × 3', '4 × 3', '4 × 3', '2 × 3']), 120, C2.wchin),
+      X('Single-arm DB row', pick(['4 × 8', '4 × 8', '4 × 8', '2 × 8']), 75, C2.row),
+      X('Push press', pick(['4 × 3 @ 80%', '4 × 3', '5 × 3 heavy', '2 × 4']), 120, C2.pushpress),
+      X('Face pull / neck', pick(['3 × 20 / 3 × 15', '3 × 20 / 3 × 15', '3 × 20 / 3 × 15', '2 × 20 / 2 × 15']), 60, C2.face + ' Then neck each way.', { tt: 'face pulls cable form' })]);
+    if (key === 'C') return build('Session C', 'Top speed', 55, pick([
+      [X('30m build-ups to 95%', '4 reps', 150, C2.maxv, { tt: 'build up runs sprint' }), X('40m sprints', '2 reps', 210, C2.sprint, { tt: TT.acc20 }), X('Broad jump', '3 × 3', 90, C2.broad, { tt: TT.broad })],
+      [X('30m sprints', '5 reps', 150, C2.sprint, { tt: TT.acc20 }), X('Flying 20m', '3 reps', 210, C2.maxv, { tt: TT.fly }), X('Broad jump', '4 × 3', 90, C2.broad, { tt: TT.broad }), X('Med ball throw', '3 × 4', 60, C2.mb, { tt: 'medicine ball rotational throw' })],
+      [X('40m sprints', '3 reps', 210, C2.sprint, { tt: TT.acc20 }), X('Flying 20m', '4 reps', 210, C2.maxv, { tt: TT.fly }), X('Broad jump', '3 × 3', 90, C2.broad, { tt: TT.broad })],
+      [X('20m sprints, easy', '4 reps', 120, 'Deload. Smooth and relaxed.', { tt: '' }), X('Jumps', '2 × 4', 90, 'Any easy jump. Quality only.', { tt: '' })]
+    ]), { note: 'Jump contacts: 90–110 a week at the top of this block. That’s the ceiling.' });
+    if (isD) return build('Session D', 'Heavy hinge', 75, [sand,
+      SL('hinge', pick([[4, 4, 85], [5, 3, 88], [4, 3, 90], [3, 3, 72.5]]), 180),
+      X('Hip thrust', pick(['4 × 8', '4 × 8', '4 × 6', '2 × 8']), 90, C2.hipthrust, { tt: 'barbell hip thrust form' }),
+      X('Reverse lunge', pick(['3 × 8 each leg', '3 × 8 each leg', '3 × 8 each leg', '2 × 8 each leg']), 75, C2.lunge),
+      X('Back extension', pick(['3 × 15', '3 × 15', '3 × 12', '2 × 12']), 60, C2.backext, { tt: '45 degree back extension form' }),
+      X('Pallof press', pick(['3 × 15 each side', '3 × 15 each side', '3 × 15 each side', '2 × 12 each side']), 60, C2.pallof),
+      X('Calf raise', pick(['3 × 20', '3 × 20', '3 × 20', '2 × 15']), 60, C2.calf),
+      X('Farmer’s carry', pick(['4 trips', '4 trips', '4 trips', '2 trips']), 90, C2.farmer, { tt: 'farmers carry form' })]);
+    if (key === 'E') return build('Session E', 'Upper power + conditioning', 70, [
+      X('Med ball overhead slam', pick(['5 × 3', '5 × 3', '5 × 3', '3 × 3']), 60, C2.slam, { tt: 'medicine ball slam' }),
+      X('Jump (or clap) push-up', pick(['4 × 4', '4 × 5', '4 × 5', '2 × 4']), 60, C2.jpush, { tt: 'clap push up technique' }),
+      X('Incline DB press', pick(['3 × 8', '3 × 8', '3 × 8', '2 × 8']), 90, C2.incline),
+      X('Chest-supported row', pick(['4 × 8', '4 × 8', '4 × 8', '2 × 8']), 75, C2.csrow),
+      X('Repeated-effort shuttles', '2 sets × 8 × 20m', 180, '20 s on, 40 s off. 3 min between sets.', { tt: 'rugby league repeat effort drill' })]);
+  }
+  /* Block 4 · weeks 13–16 */
+  if (key === 'A') return build('Session A', wk === 16 ? 'Lower · taper' : 'Lower power + speed', 70, [
+    X('Depth jump to sprint, 40–45 cm', pick(['3 × 3', '3 × 3', '3 × 3', '2 × 2']), 120, C2.depthSprint, { tt: 'depth jump to sprint' }),
+    CL(pick([[8, 2, 80], [8, 2, 82.5], [6, 2, 85], [4, 2, 75]]), 150),
+    SL('squat', pick([[4, 3, 87.5], [4, 3, 90], [3, 3, 92.5], [2, 3, 80]]), 180),
+    X('Jump squat, light (20%)', pick(['3 × 3', '3 × 3', '2 × 3', null]), 90, C2.jumpsq),
+    X('Romanian deadlift', pick(['2 × 5', '2 × 5', '2 × 5', null]), 90, C2.rdl),
+    X('Nordic curl', pick(['2 × 6', '2 × 6', '2 × 5', '2 × 4']), 90, C2.nordic),
+    X('Copenhagen plank', pick(['2 × 40 s', '2 × 40 s', '2 × 40 s', '2 × 30 s']), 60, C2.cph, { tt: 'copenhagen plank short lever' })]);
+  if (key === 'B') return build('Session B', 'Evasion + upper strength', 70, [
+    X('1-on-1 mirror evasion, 15 s', pick(['4 reps', '4 reps', '3 reps', '2 reps']), 75, C2.evade, { tt: 'rugby league evasion drill' }),
+    X('Ball-reactive cut + 10m accelerate', pick(['6 reps', '6 reps', '4 reps', '3 reps']), 75, C2.ball, { tt: TT.reactive }),
+    SL('press', pick([[4, 3, 87.5], [4, 3, 90], [3, 3, 92.5], [2, 3, 80]]), 180),
+    X('Weighted chin-up', pick(['4 × 3', '4 × 3', '3 × 3', '2 × 3']), 120, C2.wchin),
+    X('Single-arm DB row', pick(['3 × 8', '3 × 8', '3 × 8', '2 × 8']), 75, C2.row),
+    X('Push press', pick(['4 × 3', '4 × 3', '3 × 3', '2 × 3']), 120, C2.pushpress),
+    X('Face pull / neck', pick(['3 × 20 / 3 × 15', '3 × 20 / 3 × 15', '2 × 20 / 2 × 15', '2 × 15 / 2 × 15']), 60, C2.face + ' Then neck each way.', { tt: 'face pulls cable form' })]);
+  if (key === 'C') return build('Session C', 'Top speed', 45, pick([
+    [X('Flying 30m (30m build, 30m flat out)', '4 reps', 240, C2.maxv, { tt: TT.fly })],
+    [X('Flying 30m', '4 reps', 240, C2.maxv, { tt: TT.fly }), X('60m @ 95%', '3 reps', 240, C2.sprint, { tt: '' })],
+    [X('Flying 30m', '3 reps', 240, C2.maxv, { tt: TT.fly }), X('20m timed', '3 reps', 180, 'Time every rep and write it in the notes.', { tt: '' })],
+    [X('30m sprints', '2 reps', 180, 'Sharp, not tired.', { tt: '' }), X('Flying 20m', '2 reps', 210, C2.maxv, { tt: TT.fly })]
+  ]), { note: 'Jumps this block: depth jumps on Monday only. Contacts 60–80 a week.' });
+  if (isD) return build('Session D', 'Light hinge', 60, [sand,
+    SL('hinge', pick([[4, 3, 88], [4, 3, 90], [3, 3, 92.5], [2, 3, 80]]), 180),
+    X('Hip thrust', pick(['3 × 8', '3 × 8', '2 × 8', '2 × 8']), 90, C2.hipthrust, { tt: 'barbell hip thrust form' }),
+    X('Back extension', pick(['2 × 12', '2 × 12', '2 × 12', '2 × 10']), 60, C2.backext, { tt: '45 degree back extension form' }),
+    X('Pallof press', pick(['2 × 15 each side', '2 × 15 each side', '2 × 15 each side', '2 × 12 each side']), 60, C2.pallof),
+    X('Calf raise', pick(['3 × 15', '3 × 15', '2 × 15', '2 × 15']), 60, C2.calf),
+    X('Farmer’s carry', pick(['3 trips', '3 trips', '2 trips', '2 trips']), 90, C2.farmer, { tt: 'farmers carry form' })]);
+  if (key === 'E') return build('Session E', 'Short and sharp', 50, [
+    X('Med ball throw, max intent', '4 × 3', 60, C2.mb, { tt: 'medicine ball rotational throw' }),
+    X('Jump push-up', '3 × 4', 60, C2.jpush, { tt: 'clap push up technique' }),
+    X('Incline DB press', '3 × 8', 90, C2.incline),
+    X('Chest-supported row', '3 × 8', 75, C2.csrow),
+    X('40m runs @ 90%', '6 reps', 180, 'Full rest. Quality, not fitness.', { tt: '' })]);
+  return NOTRAIN.rest;
+}
+const LEGACY_KEYS = ['gymA', 'gymB', 'gymC', 'speedA', 'speedB', 'sand', 'sandHols', 'test'];
+function sessionFor(key, sp) { return LEGACY_KEYS.includes(key) ? legacySession(key, sp) : newSession(key, sp); }
+
 /* ---------- Meal plan ---------- */
-const TARGETS = { kcal: 3800, protein: 190, water: '3 litres', sleep: '9 hours' };
+const TARGETS = { kcal: 4450, restKcal: 3750, protein: 215, water: '3–3.5 litres', sleep: '9–9.5 hours' }; // 16-week program v2
 const MEALS = [
   { t: '6:45am', n: 'Breakfast', what: '¾ cup oats cooked in 300ml milk + banana + honey, 3 eggs on toast', kcal: 830, p: 40, tt: 'high protein oats eggs breakfast bulking' },
   { t: '10:30am', n: 'Recess', what: 'Greek yoghurt tub + muesli bar + 2 boiled eggs (from Sunday prep)', kcal: 520, p: 30, tt: '' },
@@ -257,12 +595,15 @@ const BEDTIME = ['10:30. Xbox off, phone down. Muscle grows while you sleep.', '
 const pick = (arr, d) => arr[Math.abs(daysBetween('2026-01-01', d)) % arr.length];
 function afternoonLine(d) {
   const k = keyFor(d), s = sessionFor(k, phaseFor(d).sp);
-  if (k === 'rest') return isSunday(d) ? 'Sunday meal prep: ' + prepFor(addDays(d, 1)).name + '. Do it now and the week is sorted.' : pick(AFTERNOON_REST, d);
+  if (k === 'rest') return isSunday(d) ? 'Sunday meal prep: ' + prepFor(addDays(d, 1)).name + '. Do it now and the week is sorted. Then the Sunday check-in: body weight and how the body feels.' : pick(AFTERNOON_REST, d);
+  if (!isTrainKey(k)) return `${s.title} today. ${s.sub}`;
   if (k === 'sand') return 'Sandhills done? Big feed, 10 minutes of stretching, lots of water.';
-  if (k === 'test') return 'Test day. Warm up properly, film every run, give every test everything.';
+  if (k === 'Dsand') return 'Sandhills done? Snack and water, then Session D at the gym. Legs cooked? Cut the accessories, keep the trap bar.';
+  if (k === 'test' || k === 'test1' || k === 'test2') return 'Test day. Warm up properly, film every run, give every test everything.';
   if (/am/.test(s.time)) return 'Morning session done? Big lunch, protein shake, feet up this arvo.';
-  return `${s.title} at ${s.time.split('–')[0]}: ${s.sub}. ${s.dad ? 'Dad’s waiting.' : 'Get to the gym.'} Snack first.`;
+  return `${s.title} at ${s.time.split('–')[0]}: ${s.sub}. ${s.dad ? 'Dad’s needed.' : 'Get to the gym.'} Snack first.`;
 }
+
 
 /* ---------- What each day is, what it builds, and how to recover ---------- */
 const TYPES = {
@@ -279,6 +620,7 @@ const RECOVER = {
   test: 'Easy evening, big feed, early night.'
 };
 function metaFor(key, sp, d) {
+  const blk = sp <= 4 ? 1 : sp <= 8 ? 2 : sp <= 12 ? 3 : 4;
   const M = {
     gymA: { t: ['WT', 'PWR'], dev: 'Upper-body strength and pushing power for contact', r: RECOVER.weights },
     gymB: { t: sp === 3 ? ['WT', 'PLY'] : ['WT'], dev: sp === 3 ? 'Leg strength turned into explosiveness (heavy squat + jumps)' : 'Leg strength and size, hip drive for the first step', r: RECOVER.weights },
@@ -288,6 +630,28 @@ function metaFor(key, sp, d) {
     sand: { t: ['FIT'], dev: 'Repeat-effort fitness and leg drive (school sandhills)', r: RECOVER.sand },
     sandHols: { t: ['FIT'], dev: 'Optional fitness top-up', r: RECOVER.sand },
     test: { t: ['TST'], dev: 'Measuring speed, power and strength progress', r: RECOVER.test },
+    A: { t: blk === 1 ? ['WT', 'PLY', 'SPR'] : blk === 2 ? ['WT', 'PWR', 'PLY'] : ['PLY', 'PWR', 'WT'],
+      dev: blk === 1 ? 'Squat strength, jumps and first-10m acceleration' : blk === 2 ? 'Squat strength and learning the hang power clean' : blk === 3 ? 'Contrast power: clean, heavy squat, then jump squats' : 'Turning strength into speed for trials', r: RECOVER.weights },
+    B: { t: ['AGI', 'WT'], dev: blk === 1 ? 'Braking and cutting, then bench and upper strength' : blk === 2 ? 'Reacting to a partner, then heavier bench' : 'Rugby-style evasion, then bench power', r: RECOVER.weights },
+    C: { t: ['SPR', 'PLY'], dev: blk <= 2 ? 'Acceleration (first 10–20m) and jumps, done fresh' : 'Top speed (flying sprints) and jumps', r: RECOVER.speed },
+    D: { t: ['WT'], dev: 'Trap-bar strength, glutes and hamstrings (posterior chain)', r: RECOVER.weights },
+    Dsand: { t: ['FIT', 'WT'], dev: 'School sandhills fitness, then trap-bar strength and hamstrings', r: RECOVER.weights },
+    E: { t: blk === 4 ? ['PWR', 'SPR'] : ['PWR', 'WT', 'FIT'], dev: blk === 4 ? 'Explosive upper body and quality runs' : 'Explosive upper body, then the week’s conditioning', r: RECOVER.weights },
+    F: { t: ['REC', 'AGI'], dev: 'Tackle technique, grip, neck and mobility. He should finish fresher than he started.', r: RECOVER.rest },
+    test1: { t: ['TST'], dev: 'Measuring speed, jumps and agility', r: RECOVER.test },
+    test2: { t: ['TST', 'WT'], dev: 'Measuring strength: the 5RMs set every working weight', r: RECOVER.test },
+    easy: { t: ['REC'], dev: 'Staying loose before the final strength tests', r: RECOVER.rest },
+    mob: { t: ['REC'], dev: 'Optional mobility between test days', r: RECOVER.rest },
+    brL: { t: ['WT'], dev: 'Keeping squat strength while team training ramps up', r: RECOVER.weights },
+    brS: { t: ['SPR'], dev: 'Keeping speed sharp into the season', r: RECOVER.speed },
+    brT: { t: ['WT'], dev: 'Light hinge and upper work to hold strength', r: RECOVER.weights },
+    isL: { t: ['WT'], dev: 'In-season minimum: hold lower-body strength', r: RECOVER.weights },
+    isS: { t: ['SPR'], dev: 'In-season minimum: keep the speed', r: RECOVER.speed },
+    isU: { t: ['WT'], dev: 'In-season minimum: hold upper-body strength', r: RECOVER.weights },
+    team: { t: ['FIT', 'AGI'], dev: 'Club training', r: RECOVER.speed },
+    teamskills: { t: ['AGI'], dev: 'Team session or skills', r: RECOVER.rest },
+    trial: { t: ['TST'], dev: 'Trial: show what the off-season built', r: RECOVER.test },
+    game: { t: ['TST'], dev: 'Game day', r: 'Cold shower or dip is fine after a game. Big feed, early night.' },
     rest: { t: ['REC'], dev: 'Recovery: this is when the muscle gets built', r: d && parse(d).getDay() === 0 ? RECOVER.sunday : RECOVER.rest }
   };
   return M[key] || M.rest;

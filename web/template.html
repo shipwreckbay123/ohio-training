@@ -361,11 +361,12 @@ function celebrate(big) {
 const LIFTS = LIFT_INFO;
 const incFor = (lift, kg) => { const i = (LIFTS[lift] || {}).inc || [2.5, 999, 2.5]; return kg < i[1] ? i[0] : i[2]; };
 // Which version of each big lift he's doing (saved on this phone)
-const variantIdx = slot => Math.min(VARIANTS[slot].length - 1, Math.max(0, Number(LS.get('ohio_var_' + slot, 0)) || 0));
+// (v2 key: the 16-week program put its own lift first, so old picks don't carry over)
+const variantIdx = slot => Math.min(VARIANTS[slot].length - 1, Math.max(0, Number(LS.get('ohio_v2_' + slot, 0)) || 0));
 function resolve(e) {
   if (!e.slot) return e;
   const v = VARIANTS[e.slot][variantIdx(e.slot)];
-  return { ...e, n: v.n, c: (e.extra || '') + v.c, tt: v.tt, lift: v.lift };
+  return { ...e, n: v.n, c: (e.extra || '') + v.c, tt: v.tt, lift: v.lift, pdf: !!v.pdf };
 }
 const itemsOf = s => s.items.map(resolve);
 function lastLift(lift, beforeDate) {
@@ -375,9 +376,45 @@ function lastLift(lift, beforeDate) {
 function suggest(lift, date) {
   const last = lastLift(lift, date);
   if (!last) return { kg: LIFTS[lift].start, text: `Starting weight ${LIFTS[lift].start}kg. Technique first.` };
-  if (phaseFor(date).sp !== phaseFor(last.date).sp) return { kg: last.kg, text: `New reps this block. Last was ${last.kg}kg on ${fmtShort(last.date)}. Pick a weight that leaves 2 in the tank.` };
+  if (phaseFor(date).id !== phaseFor(last.date).id) return { kg: last.kg, text: `New reps this block. Last was ${last.kg}kg on ${fmtShort(last.date)}. Pick a weight that leaves 2 in the tank.` };
   if (last.clean) { const kg = last.kg + incFor(lift, last.kg); return { kg, text: `Last ${last.kg}kg on ${fmtShort(last.date)}, all clean → try ${kg}kg.` }; }
   return { kg: last.kg, text: `Last ${last.kg}kg on ${fmtShort(last.date)}, form slipped → stay at ${last.kg}kg.` };
+}
+// 16-week program: weights come from % of an estimated 1RM (latest 5RM test on or before the day)
+const round25 = x => Math.round(x / 2.5) * 2.5;
+function est1RM(lift, d) {
+  const L = LIFTS[lift]; if (!L || !L.rm) return null;
+  const t = state.tests.filter(t => Number(t[L.rm]) > 0 && t.date <= d).sort((a, b) => a.date < b.date ? 1 : -1)[0];
+  return t ? { v: Number(t[L.rm]) / L.div, five: Number(t[L.rm]), date: t.date } : null;
+}
+function coachCheck(d) {
+  return state.meta.filter(m => m.kind === 'coach' && m.date <= d && daysBetween(m.date, d) <= 21).sort((a, b) => a.date < b.date ? 1 : -1)[0] || null;
+}
+function target(e, d) {
+  const programLift = e.pdf || e.lift === 'clean';
+  if (!e.pct || !programLift) {
+    const sg = suggest(e.lift, d);
+    if (e.pct && !programLift) sg.text = `No tested max for this version, so go by feel: about RPE 7–8 (2–3 reps left). ` + sg.text;
+    if (e.lift === 'clean' && !e.pct) sg.text = 'Technique weight: stop when the bar slows. ' + sg.text;
+    return sg;
+  }
+  const rm = est1RM(e.lift, d);
+  if (!rm) {
+    const sg = suggest(e.lift, d);
+    sg.text = (e.lift === 'clean' ? 'No clean max yet: get the coach to estimate one from his best technique triple and enter it on the Progress tab. Until then go by RPE 6–7 and stop when the bar slows. '
+      : 'Enter his 5RM on the Progress tab and the app works out this weight. ') + sg.text;
+    return sg;
+  }
+  const cap = e.lift === 'clean' ? 75 : 85;
+  let pct = e.pct, gate = '', gateOk = false;
+  if (pct > cap) {
+    const c = coachCheck(d);
+    if (c) { gate = `Coach check ${fmtShort(c.date)} ✓ — full ${e.pct}% is on.`; gateOk = true; }
+    else { pct = cap; gate = `No coach check in the last 3 weeks, so capped at ${cap}%. Same sets and reps, push bar speed. Log a check on the Plan tab to unlock ${e.pct}%.`; }
+  }
+  const kg = round25(rm.v * pct / 100);
+  const src = e.lift === 'clean' ? `coach-estimated clean max ${rm.five}kg` : `est. 1RM ${Math.round(rm.v)}kg (5RM ${rm.five}kg, ${fmtShort(rm.date)})`;
+  return { kg, text: `${pct}% of ${src} → ${kg}kg. If it feels like RPE 9, drop 2.5–5%.`, gate, gateOk };
 }
 
 /* ---------- Tests ---------- */
@@ -386,13 +423,17 @@ const METRICS = [
   { k: 's40', label: '40m sprint', unit: 's', better: 'down' }, { k: 'vj', label: 'Vertical jump', unit: 'cm', better: 'up' },
   { k: 'bj', label: 'Broad jump', unit: 'cm', better: 'up' }, { k: 'codR', label: '5-10-5 right first', unit: 's', better: 'down' },
   { k: 'codL', label: '5-10-5 left first', unit: 's', better: 'down' }, { k: 'chins', label: 'Chin-ups', unit: 'reps', better: 'up' },
-  { k: 'squat', label: 'Squat 3RM', unit: 'kg', better: 'up' }, { k: 'bench', label: 'Bench 3RM', unit: 'kg', better: 'up' }, { k: 'dl', label: 'Deadlift 3RM', unit: 'kg', better: 'up' }
+  { k: 's20', label: '20m sprint', unit: 's', better: 'down' },
+  { k: 'sq5', label: 'Squat 5RM', unit: 'kg', better: 'up' }, { k: 'bp5', label: 'Bench 5RM', unit: 'kg', better: 'up' },
+  { k: 'tb5', label: 'Trap-bar DL 5RM', unit: 'kg', better: 'up' }, { k: 'cl1', label: 'Clean max (coach est.)', unit: 'kg', better: 'up' },
+  { k: 'beep', label: 'Beep test', unit: 'level', better: 'up' },
+  { k: 'squat', label: 'Squat 3RM (first program)', unit: 'kg', better: 'up' }, { k: 'bench', label: 'Bench 3RM (first program)', unit: 'kg', better: 'up' }, { k: 'dl', label: 'Deadlift 3RM (first program)', unit: 'kg', better: 'up' }
 ];
 const BASELINE = { id: 'baseline', date: '2026-11-17', bw: 90, squat: 60, bench: 80, dl: 60, chins: 3, label: 'Start' };
 
 /* ---------- State + storage ---------- */
-const COLLS = ['logs', 'tests', 'meals', 'weights', 'readiness'];
-const state = { logs: [], tests: [], meals: [], weights: [], readiness: [], view: 'today', date: TODAY, calMode: 'month', calSel: TODAY, weekStart: mondayOf(TODAY), monthStart: TODAY.slice(0, 8) + '01', mealDate: TODAY, drafts: LS.get('ohio_drafts', {}), readOnly: false, testDate: TODAY };
+const COLLS = ['logs', 'tests', 'meals', 'weights', 'readiness', 'meta'];
+const state = { logs: [], tests: [], meals: [], weights: [], readiness: [], meta: [], view: 'today', date: TODAY, calMode: 'month', calSel: TODAY, weekStart: mondayOf(TODAY), monthStart: TODAY.slice(0, 8) + '01', mealDate: TODAY, drafts: LS.get('ohio_drafts', {}), readOnly: false, testDate: TODAY };
 
 const store = {
   db: null, mode: 'loading',
@@ -492,7 +533,7 @@ function badgeList() {
   let mealRun = 0, bestMealRun = 0, prev = null;
   fullMealDays.forEach(d => { mealRun = prev && addDays(prev, 1) === d ? mealRun + 1 : 1; bestMealRun = Math.max(bestMealRun, mealRun); prev = d; });
   const ws = state.weights.slice().sort((a, b) => a.date < b.date ? -1 : 1), gain = ws.length ? Math.max(...ws.map(w => w.kg)) - 90 : 0;
-  const sand = state.logs.filter(l => l.key === 'sand' || l.key === 'sandHols').length;
+  const sand = state.logs.filter(l => l.key === 'sand' || l.key === 'sandHols' || l.key === 'Dsand').length;
   const testPB = METRICS.some(m => tb[m.k] && !tb[m.k].base && state.tests.length);
   const heavy = Math.max(0, ...Object.values(lb).map(x => x.kg));
   return [
@@ -561,11 +602,11 @@ function streak() {
 }
 function renderStrip() {
   const ph = phaseFor(TODAY);
-  const wksPre = Math.max(0, Math.ceil(daysBetween(TODAY, PRESEASON) / 7));
+  const wk = weekNo(TODAY), dTrials = daysBetween(TODAY, TRIALS);
   const nextTest = TEST_DAYS.find(t => t >= TODAY);
   $('#phaseLine').textContent = 'Off-season · ' + ph.name;
   $('#strip').innerHTML = `
-    <div class="tile"><b>${wksPre}</b><span>weeks to pre-season</span></div>
+    <div class="tile"><b>${TODAY < PROGRAM_START ? daysBetween(TODAY, PROGRAM_START) : dTrials > 0 ? Math.ceil(dTrials / 7) : wk || '—'}</b><span>${TODAY < PROGRAM_START ? 'days to week 1' : dTrials > 0 ? 'weeks to trials' : wk >= 17 ? 'bridge week' : wk ? 'week of 16' : 'in-season'}</span></div>
     <div class="tile"><b>${streak()}</b><span>sessions in a row</span></div>
     <div class="tile"><b>${nextTest ? (nextTest === TODAY ? 'Today' : fmtShort(nextTest)) : '—'}</b><span>next test day</span></div>`;
 }
@@ -612,9 +653,10 @@ function renderToday() {
       ${s.dad ? `<span class="chip dad">Dad needed</span>` : ''}
     </div>
     ${ph.note ? `<div class="note">${esc(ph.note)}</div>` : ''}
+    ${s.note ? `<div class="note">${esc(s.note)}</div>` : ''}
     ${(() => { const mt = metaFor(key, ph.sp, d); return `<div class="chips">${mt.t.map(t => `<span class="ty" style="background:${TYPES[t].c};font-size:12px;padding:3px 8px">${esc(TYPES[t].n)}</span>`).join('')}</div><div class="small"><b>Develops:</b> ${esc(mt.dev)}</div><div class="small muted"><b>Recovery:</b> ${esc(mt.r)}</div>`; })()}
   </div>
-  ${isTrainKey(key) && key !== 'test' ? readyCard(d) : ''}
+  ${isTrainKey(key) && !/^test/.test(key) ? readyCard(d) : ''}
   <button class="card" type="button" data-act="goMeals" data-date="${d}" style="text-align:left;cursor:pointer;flex-direction:row;align-items:center;justify-content:space-between">
     <span><b>Meals ${mt} of ${MEALS.length}</b><br><span class="muted small">${isSunday(d) ? 'Sunday meal prep day: ' + esc(prepFor(addDays(d, 1)).name) : 'Tick them off on the Meals tab'}</span></span>${ICON_R}
   </button>`;
@@ -624,6 +666,7 @@ function renderToday() {
         <li>Sleep 9 hours. Xbox off by 10:30. This is where the size comes from.</li>
         <li>Eat the full meal plan. Protein at every meal.</li>
         ${isSunday(d) ? '<li><b>Meal prep:</b> cook the lunches for the week. See the Meals tab.</li>' : '<li>Optional: 10–15 min sauna at UFC Gym, then drink plenty of water.</li>'}
+        ${isSunday(d) && d >= PROGRAM_START ? '<li><b>Sunday check-in, 5 min:</b> body weight (morning, after the toilet), vertical jump best of 3, and sleep, soreness and motivation out of 5. VJ down 3cm+ from baseline two weeks running = overtrained or under-eating. Log the weight on the Meals tab.</li>' : ''}
         <li>A family walk or swim is fine. No extra running.</li></ul></div></div>`;
     $('#view-today').innerHTML = h; return;
   }
@@ -637,7 +680,7 @@ function renderToday() {
     const done = dr.done.includes(i);
     let liftHtml = '';
     if (e.lift) {
-      const sg = suggest(e.lift, d), cur = dr.lifts[e.lift] || {}, kg = cur.kg ?? sg.kg;
+      const sg = d >= PROGRAM_START ? target(e, d) : suggest(e.lift, d), cur = dr.lifts[e.lift] || {}, kg = cur.kg ?? sg.kg;
       liftHtml = `<div class="lift">
         <div class="stepper" role="group" aria-label="${esc(LIFTS[e.lift].name)} weight in kg">
           <button type="button" data-act="kgDown" data-lift="${e.lift}" aria-label="Less weight">−</button>
@@ -645,13 +688,14 @@ function renderToday() {
           <button type="button" data-act="kgUp" data-lift="${e.lift}" aria-label="More weight">+</button>
         </div><span class="muted small">kg</span>
         <label class="check"><input type="checkbox" id="clean-${e.lift}" data-clean="${e.lift}" ${cur.clean ? 'checked' : ''}> Every rep clean</label>
-        <span class="hint">${esc(sg.text)}</span></div>`;
+        <span class="hint">${esc(sg.text)}</span>
+        ${sg.gate ? `<span class="hint" style="font-weight:600;color:var(${sg.gateOk ? '--good' : '--bad'})">${esc(sg.gate)}</span>` : ''}</div>`;
     }
     h += `<li class="ex ${done ? 'done' : ''}">
       <button class="tick" type="button" data-act="tick" data-i="${i}" aria-pressed="${done}" aria-label="Mark ${esc(e.n)} done">${ICON_CHECK}</button>
       <div class="ex-body">
         <div class="ex-top"><span class="ex-name">${esc(e.n)}</span><span class="ex-dose">${esc(e.d)}</span></div>
-        ${e.slot ? `<div class="chips" role="group" aria-label="Pick the version">${VARIANTS[e.slot].map((v, j) => `<button class="pill" type="button" data-act="variant" data-slot="${e.slot}" data-j="${j}" aria-pressed="${variantIdx(e.slot) === j}" style="${variantIdx(e.slot) === j ? 'background:var(--accent);color:var(--accent-ink);border-color:var(--accent)' : ''}">${esc(v.short)}${j === 0 ? ' (safest)' : ''}</button>`).join('')}</div>` : ''}
+        ${e.slot ? `<div class="chips" role="group" aria-label="Pick the version">${VARIANTS[e.slot].map((v, j) => `<button class="pill" type="button" data-act="variant" data-slot="${e.slot}" data-j="${j}" aria-pressed="${variantIdx(e.slot) === j}" style="${variantIdx(e.slot) === j ? 'background:var(--accent);color:var(--accent-ink);border-color:var(--accent)' : ''}">${esc(v.short)}${v.pdf ? ' · program' : ''}${v.safe ? ' · safest' : ''}</button>`).join('')}</div>` : ''}
         <p class="cue">${esc(e.c)}</p>
         <div class="ex-actions">${ttLink(e.tt)}${e.r ? `<button class="pill" type="button" data-act="rest" data-sec="${e.r}">${ICON_TIMER} Rest ${mmss(e.r)}</button>` : ''}</div>
         ${liftHtml}
@@ -659,7 +703,7 @@ function renderToday() {
   });
   h += `</ol>`;
   if (s.warm) h += `<div class="note"><b>Cool-down · 5 min.</b> ${esc(COOLDOWN)}</div>`;
-  if (key === 'test') h += `<button class="primary" type="button" data-act="goTests">Enter test results</button>`;
+  if (/^test/.test(key)) h += `<button class="primary" type="button" data-act="goTests">Enter test results</button>`;
   const feels = [['1', 'Wrecked'], ['2', 'Flat'], ['3', 'OK'], ['4', 'Good'], ['5', 'Flying']];
   h += `<div class="card">
     <h3>How did it go?</h3>
@@ -692,7 +736,8 @@ async function saveSession() {
 }
 
 /* ---------- Calendar ---------- */
-function shortCode(k) { return ({ gymA: 'A', gymB: 'B', gymC: 'C', speedA: 'SpdA', speedB: 'SpdB', sand: 'Sand', sandHols: 'Sand', test: 'Test', rest: '' })[k] || ''; }
+function shortCode(k) { return ({ gymA: 'A', gymB: 'B', gymC: 'C', speedA: 'SpdA', speedB: 'SpdB', sand: 'Sand', sandHols: 'Sand', test: 'Test', test1: 'Test', test2: 'Test',
+  A: 'A', B: 'B', C: 'C', D: 'D', Dsand: 'D+Sand', E: 'E', F: 'F', brL: 'Lift', brS: 'Spd', brT: 'Lift', isL: 'Lift', isS: 'Spd', isU: 'Lift', team: 'Team', trial: 'Trial', game: 'Game', rest: '' })[k] || ''; }
 function renderCal() {
   let h = `<div class="stack"><div class="segctl" role="group" aria-label="Calendar view">
     <button type="button" data-act="calMode" data-v="week" aria-pressed="${state.calMode === 'week'}">Week</button>
@@ -717,7 +762,7 @@ function weekHtml() {
       <div><div class="wtitle">${esc(s.title)}</div><div class="wsub">${esc(s.sub)}${s.dad ? ' · Dad' : ''}</div></div>
       <span class="status ${st[0]}">${esc(st[1])}</span></button></li>`;
   }
-  return h + `</ul><div class="note num">${doneCount} of ${trainCount} sessions logged this week. If Dad’s on shift, move a home session to the next free day, but never the day after Gym B.</div>`;
+  return h + `</ul><div class="note num">${doneCount} of ${trainCount} sessions logged this week. Mon, Tue and Thu are the heavy days and Saturday stays easy. Missed one? Do the first two exercises and leave: 20 honest minutes beats nothing.</div>`;
 }
 function monthHtml() {
   const ms = state.monthStart, m0 = parse(ms);
@@ -820,7 +865,8 @@ function renderMeals() {
   </div>
   <div class="card"><h3>The goal</h3><ul class="rules">
     <li><b>Realistic pace:</b> 0.3–0.5kg a week, so about 6–8kg by April. 10–15kg of muscle is a 12–18 month job; keep going after pre-season starts.</li>
-    <li><b>Daily target:</b> about ${TARGETS.kcal} kcal and ${TARGETS.protein}g protein, ${TARGETS.water} of water, ${TARGETS.sleep} sleep.</li>
+    <li><b>Daily target:</b> about ${TARGETS.kcal} kcal on training days (${TARGETS.restKcal} on rest days: skip the after-school snack and halve the rice and pasta), ${TARGETS.protein}g protein every day, ${TARGETS.water} of water, ${TARGETS.sleep} sleep.</li>
+    <li><b>Scale stalled 10+ days?</b> Add one at a time, a week each: 1 L whole milk, 500 ml chocolate milk after training, 2 tbsp peanut butter, a second shake. Gaining faster than 0.6 kg a week: trim rest-day carbs.</li>
     <li><b>Creatine monohydrate</b> 5g a day in the shake is well researched and safe for healthy 18-year-olds. Check with the GP first if he has any kidney issues.</li>
     <li>Dinner comes from the family Dinner Planner. Just make his plate 1½ times bigger.</li></ul></div>
   </div>`;
@@ -931,18 +977,28 @@ async function copyText(text, boxId) {
 
 /* ---------- Plan ---------- */
 function renderPlan() {
-  let h = `<div class="stack"><div class="sec-title">The road to pre-season</div><ol class="timeline">`;
+  let h = `<div class="stack"><div class="sec-title">16 weeks to trials, then into the season</div><ol class="timeline">`;
   PHASES.forEach(p => {
     const now = TODAY >= p.start && TODAY <= p.end, past = TODAY > p.end;
     const len = daysBetween(p.start, p.end) + 1, gone = Math.min(len, Math.max(0, daysBetween(p.start, TODAY) + 1));
     h += `<li class="phase ${now ? 'now' : ''} ${past ? 'past' : ''}">
-      <div class="phase-top"><h3>${esc(p.name)}</h3><span class="dates">${esc(fmtShort(p.start))}${p.id === 'P' ? ' →' : ' – ' + esc(fmtShort(p.end))}</span></div>
+      <div class="phase-top"><h3>${esc(p.name)}</h3><span class="dates">${p.weeks ? 'Wk ' + esc(p.weeks) + ' · ' : ''}${esc(fmtShort(p.start))}${p.id === 'IS' ? ' →' : ' – ' + esc(fmtShort(p.end))}</span></div>
       <div class="small">${esc(p.focus)}</div>
+      ${p.contacts ? `<div class="small muted">Jump contacts: ${esc(p.contacts)} a week</div>` : ''}
       ${now ? `<div class="bar" aria-label="${gone} of ${len} days"><i style="width:${Math.round(gone / len * 100)}%"></i></div>` : ''}</li>`;
   });
   const nextT = TEST_DAYS.find(x => x >= TODAY);
+  const cc = coachCheck(TODAY), checks = state.meta.filter(m => m.kind === 'coach').sort((a, b) => a.date < b.date ? 1 : -1);
   h += `</ol>
-  <div class="card"><h3>Test days</h3><div class="chips">${TEST_DAYS.map(t => `<span class="chip ${t === nextT ? 'dad' : ''}">${esc(fmt(t))}</span>`).join('')}</div></div>
+  <div class="card"><h3>Test days</h3><div class="chips">${TEST_DAYS.map(t => `<span class="chip ${t === nextT ? 'dad' : ''}">${esc(fmt(t))}</span>`).join('')}</div>
+    <div class="muted small">Week 1 baseline · week 8 mid-point (weights recalculate from the new 5RMs) · week 16 final, plus the beep test.</div></div>
+  <div class="card"><h3>Coach technique checks</h3>
+    <div class="small">Needed in weeks 1–2 (squat, bench, trap bar), in week 5 before cleans are loaded, then every 2–3 weeks from Block 3. Sets above 85% (cleans above 75%) only unlock with a check in the last 3 weeks.</div>
+    <div class="small" style="font-weight:600;color:var(${cc ? '--good' : '--muted'})">${cc ? 'Covered until ' + esc(fmt(addDays(cc.date, 21))) : 'No check in the last 3 weeks.'}</div>
+    <div class="grid2"><div class="field"><label for="cdate">Date</label><input id="cdate" type="date" value="${esc(TODAY)}"></div>
+      <div class="field"><label for="cwhat">What was checked</label><input id="cwhat" placeholder="Squat, clean…" maxlength="200"></div></div>
+    <button class="primary" type="button" data-act="addCoach" ${state.readOnly ? 'disabled' : ''}>Log coach check</button>
+    ${checks.length ? `<ul class="rules">${checks.map(m => `<li>${esc(fmt(m.date))}${m.what ? ' · ' + esc(m.what) : ''} ${state.readOnly ? '' : `<button class="linkbtn" type="button" data-act="delCoach" data-id="${esc(m.id)}">Remove</button>`}</li>`).join('')}</ul>` : ''}</div>
   <div class="card"><h3>Sound effects</h3><div class="muted small">Plays when he ticks something off. Saving a full session or a PB always plays the big win.</div>
     <div class="chips">${['Big win', 'Coin cascade', 'Jackpot bells', 'Level up', 'Off'].map(n => `<button class="pill" type="button" data-act="sound" data-v="${n}" aria-pressed="${soundPref() === n}" style="${soundPref() === n ? 'background:var(--accent);color:var(--accent-ink);border-color:var(--accent)' : ''}">${n}</button>`).join('')}</div></div>
   <div class="card"><h3>Recovery guide</h3><ul class="pbs">
@@ -955,15 +1011,21 @@ function renderPlan() {
     <li><span><b>Ice bath or cold plunge</b><br><span class="muted small">Slows muscle growth after weights. OK after Thursday sandhills or game days.</span></span><b style="color:var(--bad)">Not on weights days</b></li>
     <li><span><b>Painkillers for normal soreness</b><br><span class="muted small">Soreness is normal. Only take them if a doctor or physio says to.</span></span><b style="color:var(--bad)">Avoid</b></li>
   </ul></div>
-  <div class="card"><h3>Golden rules</h3><ul class="rules">
-    <li>Sprints and jumps are done fresh, first, with full rest. Never as punishment.</li>
-    <li>Big lifts are at the gym: bench on Monday, squat and deadlift on Wednesday. He picks the version; the first one is the safest.</li>
-    <li><b>Lifting alone:</b> barbell squat and bench only inside a rack with the safety arms set, or a mate spotting. Never test a max on his own.</li>
-    <li>No sprints the day after a hard leg day.</li>
-    <li>Wednesday is the one big leg day, then Thursday is school sandhills at Greenhills. Legs will feel it; leaving 2 in the tank on Wednesday keeps that manageable.</li>
-    <li><b>Leave 2 in the tank:</b> stop the set when he could still do 2 more good reps.</li>
-    <li><b>Adding weight:</b> tick “Every rep clean” and the app adds weight next time (machines and barbells +5kg while light, then +2.5kg; bench and dumbbells +2–2.5kg).</li>
-    <li>Xbox off at 10:30. Sleep is part of the program.</li>
+  <div class="card"><h3>The 9 rules</h3><ol class="rules">
+    <li><b>Explosive work first.</b> Jumps and throws before heavy lifting, every session.</li>
+    <li><b>Speed is never conditioning.</b> Gasping = not sprinting. Full rest, walk back, stop when times drop.</li>
+    <li><b>Conditioning lives on Friday.</b> Wednesday is speed and jumps, nothing else. (Thursday school sandhills are the exception for now: we’ll adjust as we go.)</li>
+    <li><b>One big day at a time, Saturday stays easy.</b> Mon, Tue and Thu are the heavy days.</li>
+    <li><b>3 weeks hard, 1 week light.</b> Weeks 4, 8 and 12 halve the volume at about 70%.</li>
+    <li><b>Loads come from percentages.</b> 5RM in week 1, retest in week 8. The app works out the weights.</li>
+    <li><b>Durability every week.</b> Nordics, Copenhagen planks, neck, grip.</li>
+    <li><b>Count jump contacts.</b> At 90 kg, too many hammer the knees and growth plates.</li>
+    <li><b>A coach signs off the heavy stuff.</b> Cleans, and anything above 85%.</li></ol>
+    <ul class="rules">
+    <li><b>Lifting alone:</b> barbell squat and bench only inside a rack with the safety arms set, or a mate spotting. Never test a max on his own. The safer swaps (hack squat, dumbbells) go by feel.</li>
+    <li><b>The bar is the boss:</b> if 82.5% feels like RPE 9, drop to 80%.</li>
+    <li><b>Stop signs:</b> pain just below the kneecap, shin splints, or a landing you can hear from the next room. Cut jumps by half for a week.</li>
+    <li>Xbox off at 10:30. Sleep 9 hours: that’s where the muscle gets built.</li>
     <li class="muted">${esc(PAIN_RULE)}</li></ul></div>`;
   if (window.nativeSettings) h += window.nativeSettings();
   $('#view-plan').innerHTML = h + '</div>';
@@ -1044,7 +1106,16 @@ document.addEventListener('click', async ev => {
     const v = readyVerdict(r); if (v && v.cls === 'go') celebrate(false);
     render(true);
   }
-  else if (act === 'variant') { LS.set('ohio_var_' + b.dataset.slot, Number(b.dataset.j)); render(); }
+  else if (act === 'variant') { LS.set('ohio_v2_' + b.dataset.slot, Number(b.dataset.j)); render(); }
+  else if (act === 'addCoach') {
+    if (state.readOnly) { toast(NO_WRITE); return; }
+    const date = ($('#cdate') || {}).value || TODAY, what = (($('#cwhat') || {}).value || '').slice(0, 200);
+    if (await store.put('meta', 'coach_' + date, { kind: 'coach', date, what, savedAt: new Date().toISOString() })) { toast('Coach check logged.'); render(true); }
+  }
+  else if (act === 'delCoach') {
+    if (b.dataset.confirm === '1') { if (await store.del('meta', b.dataset.id)) { toast('Removed.'); render(true); } }
+    else { b.dataset.confirm = '1'; b.textContent = 'Tap again to remove'; setTimeout(() => { if (b.isConnected) { b.dataset.confirm = ''; b.textContent = 'Remove'; } }, 3000); }
+  }
   else if (act === 'save') saveSession();
   else if (act === 'saveTest') saveTest();
   else if (act === 'editTest') { state.testDate = b.dataset.date; state.testOpen = true; render(); }
