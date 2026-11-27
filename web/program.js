@@ -307,7 +307,7 @@ const SL = (slot, spec, r, extra) => { if (!spec) return null; const [s, reps, p
 const CL = (spec, r) => { if (!spec) return null; const [s, reps, pct] = spec; return E('Hang power clean', `${s} × ${reps} @ ${pct}%`, r, C2.clean, { lift: 'clean', pct, tt: 'hang power clean technique' }); };
 const durability = () => [X('Nordic curl', '2 × 5', 90, C2.nordic), X('Copenhagen plank', '2 × 30 s each side', 60, C2.cph), X('Neck', '2 × 15 each way', 60, C2.neck, { tt: 'neck training rugby prop' })];
 const SLOT = { A: ['4:00–5:20pm', 'Gym', false], B: ['4:00–5:20pm', 'Field, then gym', true], C: ['4:00–4:55pm', 'Backyard track or field', true],
-  D: ['4:00–5:15pm', 'Gym', false], Dsand: ['After school', 'Gym, after school sandhills', false], E: ['4:00–5:10pm', 'Gym, then field', false], F: ['9:00–9:45am', 'Home or club', false] };
+  D: ['4:00–5:15pm', 'Gym', false], Dsand: ['Afternoon, once home', 'Sandhills at school, then gym', false], E: ['4:00–5:00pm', 'Gym', false], F: ['9:00–9:45am', 'Home or club', false] };
 const NOTRAIN = {
   rest: { title: 'Rest day', sub: 'Recovery is when the muscle gets built', where: 'Anywhere', time: '—', dad: false, warm: null, items: [] },
   team: { title: 'Team training', sub: 'Club session. Nothing extra from this program today.', where: 'Club', time: 'Club time', dad: false, warm: null, items: [] },
@@ -331,7 +331,13 @@ function newSession(key, wk) {
   const pick = a => a[j];
   const slot = SLOT[key] || ['4:00pm–', 'Gym', false];
   const build = (title, sub, mins, items, extra = {}) => ({ title, sub, mins, time: slot[0], where: slot[1], dad: slot[2], warm: 'std', items: items.filter(Boolean), ...extra });
-  const sand = key === 'Dsand' ? X('Sandhills with school', 'Whatever the coach sets', 0, 'His hard fitness for the week. Drive the arms, short quick steps up, walk down. Then Session D after school; if his legs are cooked, cut the accessories and keep the trap bar.', { tt: 'sand dune hill sprints technique' }) : null;
+  const COND = [null,
+    () => X('Conditioning: tempo runs, 4 min @ 70%', pick(['1 run', '3 runs', '3 runs', '2 runs']), 60, C2.tempo + ' No school sandhills this week, so this is the week’s conditioning.', { tt: 'tempo runs conditioning' }),
+    () => X('Conditioning: 6 × 60m @ 85%', 'or 12 min small-sided game', 60, 'No school sandhills this week, so this is the week’s conditioning.', { tt: 'rugby league conditioning drills' }),
+    () => X('Conditioning: repeated-effort shuttles', '2 sets × 8 × 20m', 180, '20 s on, 40 s off. 3 min between sets. No school sandhills this week, so this is the week’s conditioning.', { tt: 'rugby league repeat effort drill' })];
+  const sand = key === 'Dsand'
+    ? X('Conditioning: sandhills with school', 'Whatever the coach sets', 0, 'This is the week’s conditioning. Drive the arms, short quick steps up, walk down. The rest of Session D is this afternoon once he’s home; if his legs are cooked, cut the accessories and keep the trap bar.', { tt: 'sand dune hill sprints technique' })
+    : key === 'D' && blk <= 3 ? COND[blk]() : null;
 
   if (key === 'test1') {
     const full = wk !== 8;
@@ -406,13 +412,12 @@ function newSession(key, wk) {
       X('Pallof press', pick(['3 × 12 each side', '3 × 12 each side', '3 × 15 each side', '2 × 12 each side']), 60, C2.pallof),
       X('Standing calf raise', pick(['3 × 15', '3 × 15', '3 × 20', '2 × 15']), 60, C2.calf),
       X('Heavy farmer’s carry', pick(['2 trips', '3 trips', '3 trips', '2 trips']), 90, C2.farmer, { tt: 'farmers carry form' })], light);
-    if (key === 'E') return build('Session E', 'Upper power + conditioning', 70, [
+    if (key === 'E') return build('Session E', 'Upper power', 60, [
       X('Med ball slam / rotational throw', pick(['3 × 4 each', '4 × 4 each', '4 × 5 each', '2 × 4 each']), 60, C2.mb, { tt: 'medicine ball rotational throw' }),
       X('Incline DB press', pick(['3 × 10', '3 × 10', '3 × 11', '2 × 10']), 90, C2.incline),
       X('Push press', pick(['3 × 6', '3 × 6', '3 × 7', '2 × 6']), 90, C2.pushpress),
       X('Chest-supported row', pick(['3 × 10', '3 × 10', '3 × 11', '2 × 10']), 75, C2.csrow),
-      X('Face pull', pick(['3 × 20', '3 × 20', '3 × 20', '2 × 20']), 60, C2.face, { tt: 'face pulls cable form' }),
-      X('Tempo runs: 4 min @ 70%', pick(['1 run', '3 runs', '3 runs', '2 runs']), 60, C2.tempo, { tt: 'tempo runs conditioning' })], light);
+      X('Face pull', pick(['3 × 20', '3 × 20', '3 × 20', '2 × 20']), 60, C2.face, { tt: 'face pulls cable form' })], light);
   }
   if (blk === 2) {
     if (key === 'A') return build('Session A', 'Lower strength + clean technique', 80, [
@@ -448,12 +453,11 @@ function newSession(key, wk) {
       X('Pallof press', pick(['3 × 12 each side', '3 × 12 each side', '3 × 15 each side', '2 × 12 each side']), 60, C2.pallof),
       X('Calf raise', pick(['3 × 20', '3 × 20', '3 × 20', '2 × 15']), 60, C2.calf),
       X('Farmer’s carry', pick(['3 trips', '4 trips', '4 trips', '2 trips']), 90, C2.farmer, { tt: 'farmers carry form' })]);
-    if (key === 'E') return build('Session E', 'Upper power + conditioning', 70, [
+    if (key === 'E') return build('Session E', 'Upper power', 60, [
       X('Med ball rotational throw', pick(['4 × 4 each', '4 × 4 each', '5 × 3 each', '3 × 4 each']), 60, C2.mb, { tt: 'medicine ball rotational throw' }),
       X('Incline DB press', pick(['3 × 10', '3 × 10', '3 × 8', '2 × 10']), 90, C2.incline),
       X('Weighted chin-up', pick(['4 × 5', '4 × 5', '4 × 4', '2 × 5']), 120, C2.wchin),
       X('Chest-supported row', pick(['4 × 8', '4 × 8', '4 × 8', '2 × 8']), 75, C2.csrow),
-      X('Conditioning', '6 × 60m @ 85% or 12 min small-sided game', 60, 'Builds the engine. The one conditioning session of the week.', { tt: 'rugby league conditioning drills' }),
       X('1-on-1 wrestling from knees', '3 × 45 s', 60, 'Controlled, with a sensible partner.', { tt: 'rugby league wrestle training' }),
       X('Grip fights', '3 × 30 s', 45, 'Win the hand fight, then reset.', { tt: '' })]);
   }
@@ -492,12 +496,11 @@ function newSession(key, wk) {
       X('Pallof press', pick(['3 × 15 each side', '3 × 15 each side', '3 × 15 each side', '2 × 12 each side']), 60, C2.pallof),
       X('Calf raise', pick(['3 × 20', '3 × 20', '3 × 20', '2 × 15']), 60, C2.calf),
       X('Farmer’s carry', pick(['4 trips', '4 trips', '4 trips', '2 trips']), 90, C2.farmer, { tt: 'farmers carry form' })]);
-    if (key === 'E') return build('Session E', 'Upper power + conditioning', 70, [
+    if (key === 'E') return build('Session E', 'Upper power', 60, [
       X('Med ball overhead slam', pick(['5 × 3', '5 × 3', '5 × 3', '3 × 3']), 60, C2.slam, { tt: 'medicine ball slam' }),
       X('Jump (or clap) push-up', pick(['4 × 4', '4 × 5', '4 × 5', '2 × 4']), 60, C2.jpush, { tt: 'clap push up technique' }),
       X('Incline DB press', pick(['3 × 8', '3 × 8', '3 × 8', '2 × 8']), 90, C2.incline),
-      X('Chest-supported row', pick(['4 × 8', '4 × 8', '4 × 8', '2 × 8']), 75, C2.csrow),
-      X('Repeated-effort shuttles', '2 sets × 8 × 20m', 180, '20 s on, 40 s off. 3 min between sets.', { tt: 'rugby league repeat effort drill' })]);
+      X('Chest-supported row', pick(['4 × 8', '4 × 8', '4 × 8', '2 × 8']), 75, C2.csrow)]);
   }
   /* Block 4 · weeks 13–16 */
   if (key === 'A') return build('Session A', wk === 16 ? 'Lower · taper' : 'Lower power + speed', 70, [
@@ -598,7 +601,7 @@ function afternoonLine(d) {
   if (k === 'rest') return isSunday(d) ? 'Sunday meal prep: ' + prepFor(addDays(d, 1)).name + '. Do it now and the week is sorted. Then the Sunday check-in: body weight and how the body feels.' : pick(AFTERNOON_REST, d);
   if (!isTrainKey(k)) return `${s.title} today. ${s.sub}`;
   if (k === 'sand') return 'Sandhills done? Big feed, 10 minutes of stretching, lots of water.';
-  if (k === 'Dsand') return 'Sandhills done? Snack and water, then Session D at the gym. Legs cooked? Cut the accessories, keep the trap bar.';
+  if (k === 'Dsand') return 'Sandhills done? That’s the week’s conditioning. Once home: snack and water, then the rest of Session D. Legs cooked? Cut the accessories, keep the trap bar.';
   if (k === 'test' || k === 'test1' || k === 'test2') return 'Test day. Warm up properly, film every run, give every test everything.';
   if (/am/.test(s.time)) return 'Morning session done? Big lunch, protein shake, feet up this arvo.';
   return `${s.title} at ${s.time.split('–')[0]}: ${s.sub}. ${s.dad ? 'Dad’s needed.' : 'Get to the gym.'} Snack first.`;
@@ -634,9 +637,9 @@ function metaFor(key, sp, d) {
       dev: blk === 1 ? 'Squat strength, jumps and first-10m acceleration' : blk === 2 ? 'Squat strength and learning the hang power clean' : blk === 3 ? 'Contrast power: clean, heavy squat, then jump squats' : 'Turning strength into speed for trials', r: RECOVER.weights },
     B: { t: ['AGI', 'WT'], dev: blk === 1 ? 'Braking and cutting, then bench and upper strength' : blk === 2 ? 'Reacting to a partner, then heavier bench' : 'Rugby-style evasion, then bench power', r: RECOVER.weights },
     C: { t: ['SPR', 'PLY'], dev: blk <= 2 ? 'Acceleration (first 10–20m) and jumps, done fresh' : 'Top speed (flying sprints) and jumps', r: RECOVER.speed },
-    D: { t: ['WT'], dev: 'Trap-bar strength, glutes and hamstrings (posterior chain)', r: RECOVER.weights },
-    Dsand: { t: ['FIT', 'WT'], dev: 'School sandhills fitness, then trap-bar strength and hamstrings', r: RECOVER.weights },
-    E: { t: blk === 4 ? ['PWR', 'SPR'] : ['PWR', 'WT', 'FIT'], dev: blk === 4 ? 'Explosive upper body and quality runs' : 'Explosive upper body, then the week’s conditioning', r: RECOVER.weights },
+    D: { t: blk <= 3 ? ['FIT', 'WT'] : ['WT'], dev: blk <= 3 ? 'The week’s conditioning, then trap-bar strength and hamstrings' : 'Trap-bar strength, glutes and hamstrings (posterior chain)', r: RECOVER.weights },
+    Dsand: { t: ['FIT', 'WT'], dev: 'The week’s conditioning (school sandhills), then trap-bar strength and hamstrings once home', r: RECOVER.weights },
+    E: { t: blk === 4 ? ['PWR', 'SPR'] : ['PWR', 'WT'], dev: blk === 4 ? 'Explosive upper body and quality runs' : 'Explosive upper body and pulling strength', r: RECOVER.weights },
     F: { t: ['REC', 'AGI'], dev: 'Tackle technique, grip, neck and mobility. He should finish fresher than he started.', r: RECOVER.rest },
     test1: { t: ['TST'], dev: 'Measuring speed, jumps and agility', r: RECOVER.test },
     test2: { t: ['TST', 'WT'], dev: 'Measuring strength: the 5RMs set every working weight', r: RECOVER.test },
